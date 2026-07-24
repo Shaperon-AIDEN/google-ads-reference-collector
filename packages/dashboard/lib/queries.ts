@@ -72,6 +72,7 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
 export interface AdDetailView extends AdCard {
   landingDomain: string | null;
   videoUrl: string | null;
+  advertiserId: string;
   metrics: Array<{ date: string; views: number | null; likes: number | null }>;
 }
 
@@ -91,6 +92,7 @@ export async function getAd(id: string): Promise<AdDetailView | null> {
       landingUrl: ads.landingUrl,
       landingDomain: ads.landingDomain,
       videoUrl: ads.videoUrl,
+      advertiserId: competitors.advertiserId,
       latestViews: latestViewsSql,
     })
     .from(ads)

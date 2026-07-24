@@ -7,6 +7,15 @@
 
 ---
 
+## 스코프 조정 — 비디오 광고 전용 (2026-07-24 확정)
+
+- [x] **수집 대상을 비디오 광고로 한정** — `collectAdList`·`collectForCompetitor` 가 `format === 'video'` 만 감지·수집 (이미지·텍스트 제외). 단위테스트 추가
+- [x] **영상 재생 정책**: 대시보드는 YouTube 영상만 임베드 재생. 비-YouTube 영상(googlevideo 만료 URL)은 상세에서 **투명성 센터 원본 링크** 제공
+- [x] **기존 비-비디오 데이터 삭제** — 로컬 DB 의 이미지 22·텍스트 14건 제거(비디오만 잔존). (Azure 배포 시 동일 1회 정리 필요)
+- [x] 검증 — 레퍼런스 리스트 비디오만 표시, 비-YT 상세 투명성 센터 링크 렌더, 테스트 40건 통과
+
+---
+
 ## Phase 0 — 기술 검증 (로컬)
 
 - [x] SerpApi (Ads Transparency API) 계정·키 발급, 응답 스키마 **실측** — Free Plan(250회/월). 실제 응답으로 어댑터 필드 매핑 확정, 픽스처 저장(`packages/core/test/fixtures/serpapi-{list,detail}.json`)
