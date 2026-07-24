@@ -1,0 +1,6 @@
+{
+  // 상위(workspace) 폴더의 .git 을 자동으로 열지 않는다 — 이 폴더 저장소만 표시
+  "git.openRepositoryInParentFolders": "never",
+  // 이 폴더 기준으로만 저장소 탐지
+  "git.autoRepositoryDetection": true
+}
