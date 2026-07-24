@@ -1,0 +1,74 @@
+{
+  "search_metadata": {
+    "id": "6a62af5c88aca4ec0e0778c8",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/sHa93gn_65sX5lUDxnRZxA/6a62af5c88aca4ec0e0778c8.json",
+    "created_at": "2026-07-24 00:18:36 UTC",
+    "processed_at": "2026-07-24 00:18:36 UTC",
+    "google_ads_transparency_center_ad_details_url": "https://adstransparency.google.com/advertiser/AR17828074650563772417/creative/CR18431297936794058753?region=anywhere",
+    "raw_html_file": "https://serpapi.com/searches/sHa93gn_65sX5lUDxnRZxA/6a62af5c88aca4ec0e0778c8.html",
+    "prettify_html_file": "https://serpapi.com/searches/sHa93gn_65sX5lUDxnRZxA/6a62af5c88aca4ec0e0778c8.prettify",
+    "total_time_taken": 8.29
+  },
+  "search_parameters": {
+    "engine": "google_ads_transparency_center_ad_details",
+    "advertiser_id": "AR17828074650563772417",
+    "creative_id": "CR18431297936794058753"
+  },
+  "search_information": {
+    "format": "video",
+    "last_shown": 1784850568,
+    "region_name": "anywhere",
+    "more_ads_by_advertiser": "https://adstransparency.google.com/advertiser/AR17828074650563772417",
+    "ad_funded_by": "Tesla Inc.",
+    "regions": [
+      {
+        "region": 2276,
+        "region_name": "Germany",
+        "first_shown": 20260713,
+        "last_shown": 20260723
+      }
+    ]
+  },
+  "ad_creatives": [
+    {
+      "video_link": "https://www.youtube.com/embed/TOnJMLfOZCs",
+      "headline": "Mehr Solarstrom nutzen",
+      "call_to_action": "GET_QUOTE",
+      "visible_link": "https://www.tesla.com/de_de/powerwall/Energy/Powerwall3P",
+      "height": 889,
+      "width": 400,
+      "channel_name": "Tesla",
+      "channel_icon": "https://yt3.ggpht.com/YMRZbg8UjcGgiFOj4qxIWynUkxkV9h5KcpbQGO3yuJnU34Lga3UJeCEAP3T-t7MmNj8Yxsw-EQ=s88-c-k-c0x00ffffff-no-rj",
+      "extensions": [
+        "Hot"
+      ]
+    },
+    {
+      "video_link": "https://www.youtube.com/embed/TOnJMLfOZCs",
+      "headline": "Mehr Solarstrom nutzen",
+      "call_to_action": "GET_QUOTE",
+      "visible_link": "https://www.tesla.com/de_de/powerwall/Energy/Powerwall3P",
+      "height": 889,
+      "width": 400,
+      "channel_name": "Tesla",
+      "channel_icon": "https://yt3.ggpht.com/YMRZbg8UjcGgiFOj4qxIWynUkxkV9h5KcpbQGO3yuJnU34Lga3UJeCEAP3T-t7MmNj8Yxsw-EQ=s88-c-k-c0x00ffffff-no-rj",
+      "extensions": [
+        "Hot"
+      ]
+    },
+    {
+      "video_link": "https://www.youtube.com/embed/TOnJMLfOZCs",
+      "headline": "Mehr Solarstrom nutzen",
+      "call_to_action": "GET_QUOTE",
+      "visible_link": "https://www.tesla.com/de_de/powerwall/Energy/Powerwall3P",
+      "height": 889,
+      "width": 400,
+      "channel_name": "Tesla",
+      "channel_icon": "https://yt3.ggpht.com/YMRZbg8UjcGgiFOj4qxIWynUkxkV9h5KcpbQGO3yuJnU34Lga3UJeCEAP3T-t7MmNj8Yxsw-EQ=s88-c-k-c0x00ffffff-no-rj",
+      "extensions": [
+        "Hot"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+# TODO — 구글 광고 레퍼런스 수집 시스템
+
+진행 방식: **로컬 우선 구현 → 전체 기능 테스트 완료 → Azure 배포**
+상세 설계는 [PROJECT.md](./PROJECT.md) 참조.
+
+범례: `[ ]` 미착수 · `[~]` 진행 중 · `[x]` 완료 · 🚧 게이트
+
+---
+
+## Phase 0 — 기술 검증 (로컬)
+
+- [x] SerpApi (Ads Transparency API) 계정·키 발급, 응답 스키마 **실측** — Free Plan(250회/월). 실제 응답으로 어댑터 필드 매핑 확정, 픽스처 저장(`packages/core/test/fixtures/serpapi-{list,detail}.json`)
+- [x] 실측으로 발견·수정한 스키마 차이 (가정 → 실제): `creative_id`→**`ad_creative_id`**, 게재일 ISO→**Unix 정수**, 게재일수 계산→**`total_days_shown` 제공**, 상세 `ad_details` 객체→**`ad_creatives` 변형 배열**, 랜딩 `target_url`→**`visible_link`**, 영상=**`video_link`**(youtube embed). format·게재일은 목록에만 존재 → 큐 메시지로 상세 수집기에 전달
+- [x] 실 API E2E 경로 검증 (어댑터 목록→상세→`parseYouTubeId`→`landingDomain`): Tesla 광고 실데이터로 `TOnJMLfOZCs` / `tesla.com` 도출 확인
+- [x] YouTube Data API v3 키 발급, 실키 검증 (`.env` 저장, videos.list statistics 실측 — Tesla 광고 영상 조회수 확보)
+- [x] **광고주 ID 탐색 방식 실측** — SerpApi 는 회사명 검색 미지원, `text=<도메인>` 도메인 검색만 가능. 한 도메인에 다광고주 후보 확인(tesla.com→Tesla Inc.+대만법인, coupang.com→쿠팡 주식회사 등) → 대시보드 온보딩에서 후보 선택 방식으로 설계(PROJECT.md §4.5, Phase 2)
+- [ ] 수집 대상 경쟁사 **도메인 목록** 정의 (발주처 입력) — advertiser_id 는 대시보드 온보딩이 자동 탐색하므로, 필요한 건 경쟁사 도메인 목록뿐
+- [ ] 조회수 대체 지표 등 v1.0 공통 리스크 항목 실측 확인 (선정된 경쟁사 대상 YouTube 영상 확보율 측정 → 발주처 기대치 합의)
+- [x] 데이터 모델(경쟁사·광고·지표·이력) 확정 — `packages/core/src/db/schema.ts` (4 테이블, v1.0 5장 반영)
+
+## Phase 1 — 수집 파이프라인 (로컬)
+
+### 모노레포·환경 기반
+
+- [x] pnpm 워크스페이스 스캐폴딩 (`pnpm-workspace.yaml`, 루트 `package.json`, `tsconfig.base.json`)
+- [x] `@adref/core` 패키지 구성 (tsup 빌드, typecheck·build 통과)
+- [x] `docker-compose.yml` — 로컬 PostgreSQL 16 + Azurite(Blob/Queue/Table) 정의
+- [x] `local.settings.json` / `.env` 로 시크릿·엔드포인트 주입 구조 마련 (`.env.example`, zod 검증 `config/env.ts`)
+- [x] DB 마이그레이션 스크립트 작성 (로컬·Azure 공용) — `drizzle/0000_*.sql` 생성, `pgcrypto` 확장 포함, `applyMigrations()` 러너
+
+### 어댑터·도메인 (core)
+
+- [x] 광고 소스 어댑터 인터페이스 + SerpApi 구현 + factory (`adapters/ads-source/*`)
+- [x] 큐 어댑터 (Azure Storage Queue / Azurite 공용) + factory (`adapters/queue/*`)
+- [x] Blob 어댑터 (Azure Blob / Azurite 공용) + factory (`adapters/blob/*`)
+- [x] YouTube Data API 어댑터 (50건 배치) + factory (`adapters/youtube/*`)
+- [x] 멱등 upsert 리포지토리 (`ads.upsertByCreativeId`, `adMetrics.insertSnapshot` = 이력 보존)
+- [x] 도메인 유틸: `parseYouTubeId`, `landingDomain`, `QuotaGuard`(80% 스로틀)
+- [x] core 테스트 통과 (parseYouTubeId·landingDomain·quotaGuard·serpapi 매핑/raw 보존 + **실측 픽스처 계약 테스트**)
+
+### 수집기 구현 (functions, Azure Functions v4)
+
+- [x] `@adref/functions` 패키지 구성 (host.json maxDequeueCount=5, esbuild 번들, typecheck·build 통과)
+- [x] 순수 DI 핸들러 + 얇은 트리거 분리 (`handlers/*` ↔ `functions/*`), `buildDeps` 컨텍스트 배선
+- [x] 광고 목록 수집기 (Timer Trigger) — 신규 광고 감지 → Storage Queue 적재
+- [x] 상세 수집기 (Queue Trigger) — SerpApi 상세 조회, DB upsert(`creative_id`), 썸네일 Blob 저장, 재시도→포이즌 큐
+- [x] 조회수 수집기 (Timer Trigger, 일별) — YouTube API 조회수 → `ad_metrics` 일별 스냅샷
+- [x] 목록 수집기 핸들러 테스트 (신규감지·쿼터 스로틀 partial) 통과
+
+### 로컬 스택 실측 검증
+
+- [x] Docker 스택 기동 (PostgreSQL 16 + Azurite) 및 마이그레이션 실제 적용 — 4 테이블·UNIQUE·FK·pgcrypto 확인
+- [x] seed 스크립트 2회 실행 → advertiser_id 멱등 upsert (3행 유지) 실측
+- [x] Azurite 큐 왕복(enqueue→receive→delete, base64 JSON) 스모크 통과
+- [x] 헬퍼 스크립트: `seed.ts`, `trigger.ts`(수동 발화/enqueue), `record-fixtures.ts`(Phase 0 픽스처)
+- [x] **YouTube Data API 실키 검증** — 배치 조회(2건→1 호출), bigint viewCount, 없는 ID 제외 확인
+- [x] **전체 파이프라인 E2E (실 SerpApi + 실 YouTube + 로컬 PG + Azurite)** — 목록 40건 감지→큐→상세 4건→`ads` 저장→영상 광고(`bkbfSJwdAjQ`) 썸네일 Blob 저장(12.9KB)→조회수 스냅샷(12,634,049 views) 적재. raw jsonb 보존·Unix→date 변환·landing_domain 추출 확인
+- [x] 멱등성 실측 — creative_id UNIQUE + upsert 로 재실행 시 ads 중복 0 (at-least-once 큐, 멱등 저장)
+- [x] **E2E 로 실제 통합 버그 2건 발견·수정:** (1) SerpApi `region` 은 ISO 코드 거부 → 숫자 geo target 코드 필요(KR→2410 매핑 추가), (2) `existingCreativeIds` 의 `ANY(배열)` 직렬화 오류 → Drizzle `inArray()` 로 교체
+- [x] **`func start` 로 3개 트리거 실기동 검증** (Azure Functions Core Tools 4.12.1) — timer 2종·queue 1종 등록, `%AD_QUEUE_NAME%`/`%*_CRON%` 앱설정 주입 확인
+- [x] **Queue Trigger 자동 소비** 검증 — 유효 메시지 자동 소비→DB 저장(Succeeded), Timer 트리거 admin 실행→collection_runs 기록
+- [x] **포이즌 큐 실측** — 실패 메시지 정확히 5회 재시도 후 `new-ads`→`new-ads-poison` 자동 이동(`MaxDequeueCount of 5`) 확인
+- [x] esbuild 번들 수정 — `pg` external→번들 포함(pnpm 심링크 해석 회피), `pg-native` 만 external
+
+### 미검증 갭 보강 (단위테스트)
+
+- [x] `collectAdDetail` 단위테스트 4건 — youtube 파싱·썸네일 Blob 저장·목록 필드 병합·**썸네일 실패 폴백**·**쿼터 소진 throw**
+- [x] `collectViewCounts` 단위테스트 3건 — 스냅샷 적재·대상 없음·**쿼터 소진 partial**
+- [x] YouTube 어댑터 단위테스트 5건 — bigint 파싱·**50건 초과 배치 분할**·중복/없는 id 제외·좋아요 숨김·키 누락
+- [x] 전체 테스트 **33건** 통과, 타입체크 통과
+
+## Phase 2 — 대시보드 MVP (로컬)
+
+### 경쟁사 온보딩 (도메인 → 광고주 ID 자동 탐색 → 등록 → 수집 연계) — PROJECT.md §4.5
+
+- [ ] **core 어댑터**: `AdsSource.searchAdvertisersByDomain(domain, region?)` 추가 — SerpApi 도메인 검색 응답에서 `advertiser_id`·`advertiser` 중복 제거해 후보 목록(광고주명·id·광고 수·샘플 썸네일) 반환
+- [ ] **core 어댑터 단위테스트** — 다광고주 도메인(본사+지사+대행사) 중복 제거·후보 매핑 (픽스처 기반)
+- [ ] **대시보드 화면**: 경쟁사 추가 — 도메인 입력 → 후보 조회 → 후보 선택(한 도메인 내 광고주 복수 허용) → 등록. **도메인마다 반복해 리스트 누적**
+- [ ] **경쟁사 리스트/관리 화면**: 등록된 **여러 경쟁사 전체 목록** 조회·활성/비활성·삭제, 경쟁사별 수집 광고 수·최근 신규 요약
+- [ ] **route handler** `POST /api/competitors/search` (도메인→후보), `POST /api/competitors` (선택 광고주 1+ 건 등록, `competitors` upsert), `GET /api/competitors`(리스트), `PATCH/DELETE`(활성 전환/삭제). SerpApi 키는 서버 측만
+- [ ] **수집 연계**: 등록된 활성 경쟁사 **전체**가 다음 스케줄 `collectAdList` 순회에 포함되는지 확인 (이미 다경쟁사 순회로 구현됨 — 회귀 확인)
+- [ ] (후속) **즉시 첫 수집**: HTTP 트리거 Function `collectForCompetitor`(단일 광고주 목록→큐) + 대시보드 "지금 수집" 버튼
+- [ ] (후속) **일괄 등록**: 도메인 여러 개를 한 번에 입력해 순차 탐색·등록 (경쟁사 대량 온보딩 편의)
+
+### 조회·관리 화면
+
+- [ ] Next.js 앱 스캐폴딩 (`next dev`)
+- [ ] 광고 목록·상세·지표 조회 화면
+- [ ] 썸네일/영상 캐시(Blob) 표시
+- [ ] 경쟁사 관리(활성/비활성 전환, 경쟁사별 수집 수·최근 신규 요약)
+- [ ] 로컬 개발용 목/우회 인증 (Entra ID는 배포 시 연결)
+- [ ] DB 조회 API (App Service 이관 대비 추상화)
+
+## Phase 3 — 로컬 통합 테스트 🚧 게이트
+
+- [ ] 실제 SerpApi/YouTube 키로 E2E 검증 (수집 → 저장 → 대시보드 조회)
+- [ ] 수집기 단위/통합 테스트 작성 및 통과
+- [ ] 쿼터 가드·재시도·멱등성 테스트
+- [ ] 에러/실패 시나리오 점검 (API 오류, 빈 응답, 중복)
+- [ ] **전체 기능 테스트 통과 확인 → Phase 4 진입 승인**
+
+> 🚧 이 게이트 통과 전에는 Azure 리소스를 프로비저닝하지 않는다.
+
+## Phase 4 — Azure 프로비저닝
+
+- [ ] 구독·리소스 그룹 생성 (`rg-adref-prod`, Korea Central) + 비용 경보
+- [ ] Bicep 템플릿 작성: Storage Account, PostgreSQL Flexible Server, Key Vault, Function App, App Service, Application Insights
+- [ ] Key Vault에 SerpApi·YouTube 키 등록
+- [ ] Functions/App Service에 Managed Identity 부여 및 Key Vault 참조 설정
+- [ ] Azure PostgreSQL에 스키마 마이그레이션 적용 (로컬과 동일 스크립트)
+- [ ] DB 방화벽(Azure 서비스·사내 IP) 설정
+
+## Phase 5 — Azure 배포·안정화
+
+- [ ] GitHub Actions 파이프라인 구성 (main → Functions·App Service 자동 배포)
+- [ ] Functions 배포 및 Timer/Queue Trigger 동작 확인
+- [ ] Next.js 대시보드 App Service 배포
+- [ ] Entra ID 앱 등록 + App Service Easy Auth 연결, 접근 허용 그룹 지정
+- [ ] Application Insights 커스텀 메트릭(신규 광고 수·API 호출 수) 기록
+- [ ] Azure Monitor 경보 (연속 실패·쿼터 80%) → 이메일/Slack/Teams
+- [ ] 스테이징 스모크 테스트 (수집→저장→대시보드 조회)
+- [ ] 운영 전환 및 Bicep 템플릿·운영 런북 문서화

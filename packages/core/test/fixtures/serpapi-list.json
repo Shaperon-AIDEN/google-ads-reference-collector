@@ -1,0 +1,91 @@
+{
+  "search_metadata": {
+    "id": "6a62af49ae678cc2c0b13261",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/Gs3I2eFNzHnOD8GzGqQJwA/6a62af49ae678cc2c0b13261.json",
+    "created_at": "2026-07-24 00:18:17 UTC",
+    "processed_at": "2026-07-24 00:18:17 UTC",
+    "google_ads_transparency_center_url": "https://adstransparency.google.com/advertiser/AR17828074650563772417?region=anywhere",
+    "raw_html_file": "https://serpapi.com/searches/Gs3I2eFNzHnOD8GzGqQJwA/6a62af49ae678cc2c0b13261.html",
+    "prettify_html_file": "https://serpapi.com/searches/Gs3I2eFNzHnOD8GzGqQJwA/6a62af49ae678cc2c0b13261.prettify",
+    "total_time_taken": 0.87
+  },
+  "search_parameters": {
+    "engine": "google_ads_transparency_center",
+    "advertiser_id": "AR17828074650563772417",
+    "num": "5"
+  },
+  "search_information": {
+    "total_results": 5000
+  },
+  "ad_creatives": [
+    {
+      "advertiser_id": "AR17828074650563772417",
+      "advertiser": "Tesla Inc.",
+      "ad_creative_id": "CR18431297936794058753",
+      "format": "video",
+      "link": "https://displayads-formats.googleusercontent.com/ads/preview/content.js?client=ads-integrity-transparency&obfuscatedCustomerId=3048479154&creativeId=816236219714&uiFeatures=12,54&adGroupId=198295937916&allowedVariations=55&sig=ACiVB_xsdSsOf-ZUY8iRFCQ5FD-uszsqPg&htmlParentId=fletch-render-7927962936418336591&responseCallback=fletchCallback7927962936418336591",
+      "total_days_shown": 11,
+      "first_shown": 1783949267,
+      "last_shown": 1784850568,
+      "details_link": "https://adstransparency.google.com/advertiser/AR17828074650563772417/creative/CR18431297936794058753?region=anywhere",
+      "serpapi_details_link": "https://serpapi.com/search.json?advertiser_id=AR17828074650563772417&creative_id=CR18431297936794058753&engine=google_ads_transparency_center_ad_details"
+    },
+    {
+      "advertiser_id": "AR17828074650563772417",
+      "advertiser": "Tesla Inc.",
+      "ad_creative_id": "CR10885195978617389057",
+      "format": "video",
+      "link": "https://displayads-formats.googleusercontent.com/ads/preview/content.js?client=ads-integrity-transparency&obfuscatedCustomerId=5877708682&creativeId=807674965122&uiFeatures=12,54&adGroupId=200977617824&versionId=2&sig=ACiVB_zAE5-V5C5tYgC0COMB5iW9dssKpg&htmlParentId=fletch-render-11852446539621163990&responseCallback=fletchCallback11852446539621163990",
+      "total_days_shown": 81,
+      "first_shown": 1777928656,
+      "last_shown": 1784850081,
+      "details_link": "https://adstransparency.google.com/advertiser/AR17828074650563772417/creative/CR10885195978617389057?region=anywhere",
+      "serpapi_details_link": "https://serpapi.com/search.json?advertiser_id=AR17828074650563772417&creative_id=CR10885195978617389057&engine=google_ads_transparency_center_ad_details"
+    },
+    {
+      "advertiser_id": "AR17828074650563772417",
+      "advertiser": "Tesla Inc.",
+      "ad_creative_id": "CR02051100750766931969",
+      "format": "text",
+      "image": "https://tpc.googlesyndication.com/archive/simgad/12092104979384206456",
+      "width": 365,
+      "height": 539,
+      "total_days_shown": 548,
+      "first_shown": 1726590509,
+      "last_shown": 1784850031,
+      "details_link": "https://adstransparency.google.com/advertiser/AR17828074650563772417/creative/CR02051100750766931969?region=anywhere",
+      "serpapi_details_link": "https://serpapi.com/search.json?advertiser_id=AR17828074650563772417&creative_id=CR02051100750766931969&engine=google_ads_transparency_center_ad_details"
+    },
+    {
+      "advertiser_id": "AR17828074650563772417",
+      "advertiser": "Tesla Inc.",
+      "ad_creative_id": "CR00352877064249933825",
+      "format": "video",
+      "link": "https://displayads-formats.googleusercontent.com/ads/preview/content.js?client=ads-integrity-transparency&obfuscatedCustomerId=6697700994&creativeId=816216579971&uiFeatures=12,54&adGroupId=196928099694&versionId=1&assets=%3DH4sIAAAAAAAAAJNi5_i6Zt2WE8wABFWM4wkAAAA&sig=ACiVB_x_jLKhbe4uTEJCdcbTeihqMXL6hA&htmlParentId=fletch-render-17815083745147114721&responseCallback=fletchCallback17815083745147114721",
+      "total_days_shown": 13,
+      "first_shown": 1783590383,
+      "last_shown": 1784849895,
+      "details_link": "https://adstransparency.google.com/advertiser/AR17828074650563772417/creative/CR00352877064249933825?region=anywhere",
+      "serpapi_details_link": "https://serpapi.com/search.json?advertiser_id=AR17828074650563772417&creative_id=CR00352877064249933825&engine=google_ads_transparency_center_ad_details"
+    },
+    {
+      "advertiser_id": "AR17828074650563772417",
+      "advertiser": "Tesla Inc.",
+      "ad_creative_id": "CR09304441193834217473",
+      "format": "text",
+      "image": "https://tpc.googlesyndication.com/archive/simgad/15085485224318615949",
+      "width": 380,
+      "height": 199,
+      "total_days_shown": 706,
+      "first_shown": 1722966523,
+      "last_shown": 1784849107,
+      "details_link": "https://adstransparency.google.com/advertiser/AR17828074650563772417/creative/CR09304441193834217473?region=anywhere",
+      "serpapi_details_link": "https://serpapi.com/search.json?advertiser_id=AR17828074650563772417&creative_id=CR09304441193834217473&engine=google_ads_transparency_center_ad_details"
+    }
+  ],
+  "serpapi_pagination": {
+    "next_page_token": "CgoAP7zmosG77QvrEhD1fql57Ckct2RV4O0AAAAAGgn8+G9Q+OPMkkU=",
+    "next": "https://serpapi.com/search.json?advertiser_id=AR17828074650563772417&engine=google_ads_transparency_center&next_page_token=CgoAP7zmosG77QvrEhD1fql57Ckct2RV4O0AAAAAGgn8%2BG9Q%2BOPMkkU%3D&num=5"
+  }
+}

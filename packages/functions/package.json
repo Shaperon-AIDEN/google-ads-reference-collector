@@ -1,0 +1,23 @@
+{
+  "name": "@adref/functions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "typecheck": "tsc --noEmit",
+    "start": "func start",
+    "prestart": "pnpm build"
+  },
+  "dependencies": {
+    "@adref/core": "workspace:*",
+    "@azure/functions": "^4.6.0"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "4",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

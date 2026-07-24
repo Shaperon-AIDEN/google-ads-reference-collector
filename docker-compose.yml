@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: adref-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: adref
+      POSTGRES_USER: ${POSTGRES_USER:-adref}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-adref}
+    ports:
+      - "5432:5432"
+    volumes:
+      - adref-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-adref} -d adref"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: adref-azurite
+    restart: unless-stopped
+    # --skipApiVersionCheck: Azure SDK 최신 API 버전을 Azurite 가 아직 미지원할 때 우회
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /data --skipApiVersionCheck"
+    ports:
+      - "10000:10000" # blob
+      - "10001:10001" # queue
+      - "10002:10002" # table
+    volumes:
+      - adref-azurite:/data
+
+volumes:
+  adref-pgdata:
+  adref-azurite:
