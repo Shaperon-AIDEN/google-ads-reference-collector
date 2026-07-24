@@ -67,4 +67,6 @@
 - **광고주 탐색:** SerpApi 는 회사명 검색을 지원하지 않는다. `text=<도메인>`(예: `text=coupang.com`) **도메인 검색**으로만 advertiser_id 를 얻으며, 응답 `ad_creatives[].advertiser_id`·`advertiser` 에서 추출한다. 한 도메인에 **여러 광고주**(본사·해외지사·대행사)가 나오므로 자동 확정 금지 — 대시보드에서 후보를 사용자가 선택한다(PROJECT.md §4.5).
 - **region:** SerpApi 는 ISO 코드("KR")를 거부하고 **숫자 geo target 코드**를 요구한다(KR=2410, US=2840). `serpapi.ts` 의 `toSerpApiRegion` 이 매핑하며, DB `competitors.region` 은 ISO 코드로 유지한다.
 - **DB 배열 컬럼:** `text[]`(예: `platforms`) 필터는 raw `ANY(${array})` 대신 Drizzle `inArray()` 를 쓴다 (배열 리터럴 직렬화 오류 방지).
+- **상세 "결과 없음":** 일부 크리에이티브는 상세 API 가 "hasn't returned any results" 를 반환한다(영구 조건). `getAdDetail` 은 이 경우 예외 대신 빈 상세(`raw.detailUnavailable`)를 반환해 목록 데이터만으로 저장 — 재시도·포이즌·쿼터 낭비를 막는다.
+- **쿼터 주의:** 광고 N건 수집 = 목록 1 + 상세 N SerpApi 호출. "지금 수집"으로 대형 광고주(40건)를 수집하면 ~41회 소모. Free 250/월 에선 몇 번이면 소진 — 운영은 Developer 5000/월.
 - **Azurite:** Azure SDK 최신 API 버전 미지원 시 `--skipApiVersionCheck` 필요 (docker-compose 반영됨).

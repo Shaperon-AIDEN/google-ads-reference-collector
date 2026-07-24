@@ -79,7 +79,8 @@
 - [x] **경쟁사 리스트/관리 화면**(`CompetitorList`): 전체 목록 조회·활성/비활성·삭제, 경쟁사별 수집 광고 수
 - [x] **route handler**: `POST /search`(도메인→후보), `GET/POST /api/competitors`(리스트/등록), `PATCH/DELETE /api/competitors/[id]`(활성 전환/삭제). SerpApi 키는 서버 측만. **전 API 실동작 검증**(등록 201, 목록·PATCH·DELETE 200)
 - [x] **수집 연계 확인**: 온보딩 등록 → `competitors` 활성 행 → 기존 다경쟁사 순회 `collectAdList` 가 자동 포함 (등록 즉시 활성 상태 확인)
-- [ ] (후속) **즉시 첫 수집**: HTTP 트리거 Function `collectForCompetitor`(단일 광고주 목록→큐) + 대시보드 "지금 수집" 버튼
+- [x] (후속) **즉시 첫 수집**: HTTP 트리거 Function `collectForCompetitor`(단일 경쟁사 목록→앞 8건 인라인 상세+나머지 큐) + 대시보드 "지금 수집" 버튼 + 프록시 route(`/api/competitors/[id]/collect`). **실측 검증** — 쿠팡 40건(즉시 8 + 큐 32)→40/40, 대시보드 프록시 200·멱등(재실행 신규 0)
+- [x] (버그수정) 상세 "결과 없음" 그레이스풀 처리 — SerpApi 상세 미제공 크리에이티브를 예외→5회 재시도→포이즌 대신 **목록 데이터만으로 저장**(쿼터 낭비 방지). 포이즌 3건 재구동으로 검증
 - [ ] (후속) **일괄 등록**: 도메인 여러 개를 한 번에 입력해 순차 탐색·등록
 
 ### 조회·관리 화면

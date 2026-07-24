@@ -69,12 +69,23 @@ describe('SerpApiAdsSource (실제 응답 스키마 기준)', () => {
     expect(apiCalls).toBe(1);
   });
 
-  it('SerpApi error 필드는 예외로 변환', async () => {
+  it('SerpApi error 필드는 예외로 변환 (목록)', async () => {
     const src = new SerpApiAdsSource({
       apiKey: 'k',
       fetchImpl: mockFetch({ error: "hasn't returned any results" }),
     });
     await expect(src.listAds({ advertiserId: 'AR_NONE' })).rejects.toThrow(/SerpApi 오류/);
+  });
+
+  it('상세 "결과 없음" 은 예외 대신 빈 상세 반환 (재시도 방지)', async () => {
+    const src = new SerpApiAdsSource({
+      apiKey: 'k',
+      fetchImpl: mockFetch({ error: "Ad Details hasn't returned any results for this query." }),
+    });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_GONE' });
+    expect(detail.creativeId).toBe('CR_GONE');
+    expect(detail.videoUrl).toBeUndefined();
+    expect(detail.raw).toMatchObject({ detailUnavailable: true });
   });
 
   it('apiKey 누락 시 생성자에서 예외', () => {

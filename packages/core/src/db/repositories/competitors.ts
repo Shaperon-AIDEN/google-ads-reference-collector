@@ -24,6 +24,11 @@ export class CompetitorRepository {
     await this.db.delete(competitors).where(eq(competitors.id, id));
   }
 
+  async findById(id: string): Promise<Competitor | undefined> {
+    const rows = await this.db.select().from(competitors).where(eq(competitors.id, id)).limit(1);
+    return rows[0];
+  }
+
   async findByAdvertiserId(advertiserId: string): Promise<Competitor | undefined> {
     const rows = await this.db
       .select()

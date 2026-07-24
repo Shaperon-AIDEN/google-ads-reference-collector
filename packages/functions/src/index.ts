@@ -2,3 +2,4 @@
 import './functions/adListCollector.js';
 import './functions/adDetailCollector.js';
 import './functions/viewCountCollector.js';
+import './functions/collectForCompetitorHttp.js';
