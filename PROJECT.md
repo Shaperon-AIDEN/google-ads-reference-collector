@@ -8,7 +8,7 @@
 - **인프라:** Microsoft Azure (서버리스 우선 + 관리형 PostgreSQL)
 - **리소스 그룹 / 리전:** `rg-adref-prod` / Korea Central
 - **진행 방식:** **로컬 우선 구현 → 전체 기능 테스트 완료 → Azure 배포** (아래 0장 참조)
-- **현재 진행:** Phase 1 (수집 파이프라인) 구현 중 — 모노레포(pnpm)·`@adref/core`(어댑터/DB/도메인)·`@adref/functions`(수집기 3종) 구축 완료, 로컬 Docker(PostgreSQL+Azurite)에서 마이그레이션·시드·큐 왕복 실측 검증. 상세는 [TODO.md](./TODO.md). 확정 기술 스택은 [CLAUDE.md](./CLAUDE.md).
+- **현재 진행:** Phase 2 (대시보드 MVP) 구현 — Phase 1(수집 파이프라인) 실 API E2E·Functions 런타임·포이즌 큐 검증 완료. Phase 2 에서 `@adref/dashboard`(Next.js 14) 구축: **경쟁사 온보딩**(도메인→광고주 탐색→등록→수집 연계, §4.5), 레퍼런스 리스트·상세·수집 현황 화면을 로컬 라이브 DB·실 SerpApi 로 검증. 상세는 [TODO.md](./TODO.md). 확정 기술 스택은 [CLAUDE.md](./CLAUDE.md).
 
 ---
 

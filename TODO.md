@@ -73,23 +73,25 @@
 
 ### 경쟁사 온보딩 (도메인 → 광고주 ID 자동 탐색 → 등록 → 수집 연계) — PROJECT.md §4.5
 
-- [ ] **core 어댑터**: `AdsSource.searchAdvertisersByDomain(domain, region?)` 추가 — SerpApi 도메인 검색 응답에서 `advertiser_id`·`advertiser` 중복 제거해 후보 목록(광고주명·id·광고 수·샘플 썸네일) 반환
-- [ ] **core 어댑터 단위테스트** — 다광고주 도메인(본사+지사+대행사) 중복 제거·후보 매핑 (픽스처 기반)
-- [ ] **대시보드 화면**: 경쟁사 추가 — 도메인 입력 → 후보 조회 → 후보 선택(한 도메인 내 광고주 복수 허용) → 등록. **도메인마다 반복해 리스트 누적**
-- [ ] **경쟁사 리스트/관리 화면**: 등록된 **여러 경쟁사 전체 목록** 조회·활성/비활성·삭제, 경쟁사별 수집 광고 수·최근 신규 요약
-- [ ] **route handler** `POST /api/competitors/search` (도메인→후보), `POST /api/competitors` (선택 광고주 1+ 건 등록, `competitors` upsert), `GET /api/competitors`(리스트), `PATCH/DELETE`(활성 전환/삭제). SerpApi 키는 서버 측만
-- [ ] **수집 연계**: 등록된 활성 경쟁사 **전체**가 다음 스케줄 `collectAdList` 순회에 포함되는지 확인 (이미 다경쟁사 순회로 구현됨 — 회귀 확인)
+- [x] **core 어댑터**: `AdsSource.searchAdvertisersByDomain(domain, region?)` — SerpApi 도메인 검색에서 `advertiser_id`·`advertiser` 중복 제거해 후보(광고주명·id·광고 수·샘플 썸네일) 반환, 광고 수 내림차순
+- [x] **core 어댑터 단위테스트 2건** — 다광고주 중복 제거·정렬·샘플썸네일·id 누락 제외·error 처리 + 실 SerpApi(coupang.com→4후보) 검증
+- [x] **대시보드 화면**: 경쟁사 추가(`CompetitorOnboarding`) — 도메인 입력 → 후보 조회 → 후보 선택(복수) → 등록. 도메인마다 반복해 리스트 누적
+- [x] **경쟁사 리스트/관리 화면**(`CompetitorList`): 전체 목록 조회·활성/비활성·삭제, 경쟁사별 수집 광고 수
+- [x] **route handler**: `POST /search`(도메인→후보), `GET/POST /api/competitors`(리스트/등록), `PATCH/DELETE /api/competitors/[id]`(활성 전환/삭제). SerpApi 키는 서버 측만. **전 API 실동작 검증**(등록 201, 목록·PATCH·DELETE 200)
+- [x] **수집 연계 확인**: 온보딩 등록 → `competitors` 활성 행 → 기존 다경쟁사 순회 `collectAdList` 가 자동 포함 (등록 즉시 활성 상태 확인)
 - [ ] (후속) **즉시 첫 수집**: HTTP 트리거 Function `collectForCompetitor`(단일 광고주 목록→큐) + 대시보드 "지금 수집" 버튼
-- [ ] (후속) **일괄 등록**: 도메인 여러 개를 한 번에 입력해 순차 탐색·등록 (경쟁사 대량 온보딩 편의)
+- [ ] (후속) **일괄 등록**: 도메인 여러 개를 한 번에 입력해 순차 탐색·등록
 
 ### 조회·관리 화면
 
-- [ ] Next.js 앱 스캐폴딩 (`next dev`)
-- [ ] 광고 목록·상세·지표 조회 화면
-- [ ] 썸네일/영상 캐시(Blob) 표시
-- [ ] 경쟁사 관리(활성/비활성 전환, 경쟁사별 수집 수·최근 신규 요약)
-- [ ] 로컬 개발용 목/우회 인증 (Entra ID는 배포 시 연결)
-- [ ] DB 조회 API (App Service 이관 대비 추상화)
+- [x] Next.js 14 앱 스캐폴딩 (App Router, `next dev`, transpilePackages `@adref/core`)
+- [x] 레퍼런스 리스트(메인): 카드 그리드, 정렬(최신/조회수/게재기간), 경쟁사·형식 필터, YouTube 썸네일
+- [x] 광고 상세: YouTube 임베드 재생, 게재 기간·랜딩 URL, 조회수 성장(일별 스냅샷) 막대 그래프
+- [x] 수집 현황: 최근 실행 이력, 이번 달 API 사용량(예산 대비 %) 게이지
+- [x] 로컬 개발용 목 인증(`AUTH_MODE=mock`) — Azure 는 Easy Auth 헤더(`x-ms-client-principal-name`) 읽도록 설계
+- [x] DB 직접 조회 계층(`lib/queries.ts`) — 수집기=쓰기, 대시보드=읽기
+- [x] **로컬 실동작 검증** — Docker PG 라이브 데이터로 4개 페이지 렌더(200), Next 빌드 8라우트 통과, 타입체크·35 테스트 통과
+- [ ] 썸네일 Blob 직접 서빙 (현재 MVP 는 YouTube 썸네일 URL 사용, Blob 캐시 서빙은 후속)
 
 ## Phase 3 — 로컬 통합 테스트 🚧 게이트
 

@@ -36,6 +36,9 @@ export class FakeAdsSource implements AdsSource {
     throw new Error('not used');
     return { detail: null as never, apiCalls: 1 };
   }
+  async searchAdvertisersByDomain() {
+    return { candidates: [], apiCalls: 1 };
+  }
   apiCalls(): number {
     return this.calls;
   }
@@ -50,6 +53,9 @@ export class FakeDetailSource implements AdsSource {
   }
   async getAdDetail() {
     return { detail: this.detail, apiCalls: 1 };
+  }
+  async searchAdvertisersByDomain() {
+    return { candidates: [], apiCalls: 1 };
   }
 }
 
