@@ -47,6 +47,13 @@
 - 클라우드에 닿는 것(SerpApi/YouTube/큐/Blob/DB)은 `@adref/core` 어댑터 인터페이스 + `factory(env)` 뒤에 둔다.
 - 실제 로직은 어댑터를 인자로 받는 **순수 DI 핸들러**(`packages/functions/src/handlers/*`)에 두고, 트리거(`functions/*`)는 얇게 배선만 한다.
 
+## Git 병합 규칙
+
+- PR 병합은 **merge commit** 으로 한다: `gh pr merge <n> --merge --delete-branch`. **squash 병합 금지** — 브랜치의 개별 커밋이 하나로 합쳐져(사실상 삭제) 히스토리가 선형이 되기 때문.
+- 목적: main 히스토리에 브랜치가 갈라졌다 병합되는 **그래프**(두 부모 merge commit)가 남아, `git log --graph`·GitHub network graph 에서 병합 이력이 보이도록 한다.
+- 브랜치 ref 는 병합 후 삭제해도 무방하다 — 커밋은 merge commit 을 통해 main 에 보존된다.
+- 작업은 `feature/*`·`fix/*`·`chore/*` 브랜치에서 하고 main 직접 push 는 금지 (전역 브랜치 정책).
+
 ## 규칙
 
 - 시크릿(SerpApi·YouTube 키)은 코드/문서에 하드코딩 금지. 로컬은 `.env`/`local.settings.json`, Azure는 Key Vault.
