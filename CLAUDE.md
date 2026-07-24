@@ -76,6 +76,17 @@
 - **상세 "결과 없음":** 일부 크리에이티브는 상세 API 가 "hasn't returned any results" 를 반환한다(영구 조건). `getAdDetail` 은 이 경우 예외 대신 빈 상세(`raw.detailUnavailable`)를 반환해 목록 데이터만으로 저장 — 재시도·포이즌·쿼터 낭비를 막는다.
 - **쿼터 주의:** 광고 N건 수집 = 목록 1 + 상세 N SerpApi 호출. "지금 수집"으로 대형 광고주(40건)를 수집하면 ~41회 소모. Free 250/월 에선 몇 번이면 소진 — 운영은 Developer 5000/월. 대형 광고주 폭주 방지로 `collectForCompetitor` 에 `maxTotal` 상한 지원.
 
+## 데이터 소스 스위칭 (SerpApi ↔ 크롤)
+
+- `ADS_SOURCE` 환경변수로 광고 데이터 소스를 고른다. **롤백은 이 값만 변경**(코드 변경 없음):
+  - `serpapi` (기본·안정·유료): `SerpApiAdsSource`. SerpApi 코드는 크롤 도입과 무관하게 유지 → 롤백 경로 안전.
+  - `crawl` (무료·비공식·실험적): `TransparencyCrawlAdsSource`. 투명성 센터 내부 RPC 직접 호출(curl).
+    - 목록: `SearchService/SearchCreatives`, req `{"2":n,"3":{"12":{"1":"","2":true},"13":{"1":[advertiserId]}},"7":{"1":1,"2":0,"3":region}}`, 페이지네이션=req field `4`(=응답 field `2` 토큰). 응답 item: `2`=creativeId, `4`=format(1/2/3), `6`/`7`=Unix 게재일.
+    - 상세: `LookupService/GetCreativeById` → 미리보기 `content.js` fetch → `ytimg.com/vi/<id>` 정규식으로 YouTube ID 추출.
+    - **제한**: 랜딩 URL 미확보(null), 도메인 검색 미지원(회사명 검색 사용). `apiCalls=0`(쿼터 미소모).
+    - **리스크**: 비공식·형식 변동 시 조용히 빈 결과, 대량 시 봇 차단 가능, ToS. 깨지면 `ADS_SOURCE=serpapi` 로 롤백.
+- 전체 수집: `collectForCompetitor` 가 `nextPageToken` 으로 페이지네이션(최대 200페이지, `maxTotal` 상한). 크롤은 무료라 전체 수집 실용적.
+
 ## 광고주 이름 검색 (Google 투명성 자동완성)
 
 - 회사명 → 광고주 후보는 **Google 투명성 센터 내부 RPC** `SearchService/SearchSuggestions` 로 얻는다(`GoogleTransparencyAdvertiserSearch`). SerpApi 는 회사명 검색 미지원.

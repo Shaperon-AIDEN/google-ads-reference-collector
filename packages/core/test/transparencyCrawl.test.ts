@@ -1,0 +1,74 @@
+import { describe, expect, it, vi } from 'vitest';
+import { TransparencyCrawlAdsSource, type CrawlTransport } from '../src/adapters/ads-source/transparencyCrawl.js';
+
+describe('TransparencyCrawlAdsSource', () => {
+  it('listAds: SearchCreatives 응답을 매핑 + 페이지네이션 토큰', async () => {
+    // 실측 응답 구조 재현 (item: 1=advertiserId, 2=creativeId, 4=format, 6/7=unix dates)
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': [
+          { '1': 'AR1', '2': 'CR_VID', '4': 3, '6': { '1': '1784000000' }, '7': { '1': '1784864000' } },
+          { '1': 'AR1', '2': 'CR_TXT', '4': 1, '6': { '1': '1784000000' }, '7': { '1': '1784086400' } },
+          { '1': 'AR1', '4': 3 }, // creativeId 없음 → 제외
+        ],
+        '2': 'NEXT_PAGE_TOKEN',
+      }),
+    );
+    const transport: CrawlTransport = { rpc, get: vi.fn() };
+    const src = new TransparencyCrawlAdsSource(transport);
+
+    const res = await src.listAds({ advertiserId: 'AR1', region: 'KR' });
+
+    expect(res.apiCalls).toBe(0); // SerpApi 쿼터 미소모
+    expect(res.nextPageToken).toBe('NEXT_PAGE_TOKEN');
+    expect(res.items).toHaveLength(2);
+    expect(res.items[0]).toMatchObject({ creativeId: 'CR_VID', format: 'video' });
+    expect(res.items[0]!.firstShown).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(res.items[1]).toMatchObject({ creativeId: 'CR_TXT', format: 'text' });
+    // 요청에 advertiser_id 가 배열(3.13.1)로 들어갔는지
+    const sentBody = JSON.parse((rpc.mock.calls[0]![1] as string));
+    expect(sentBody['3']['13']['1']).toEqual(['AR1']);
+    expect(sentBody['7']['3']).toBe(2410); // KR region
+  });
+
+  it('listAds: 두 번째 페이지 요청에 pageToken 이 field 4 로 포함', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': [], '2': null }));
+    const src = new TransparencyCrawlAdsSource({ rpc, get: vi.fn() });
+    await src.listAds({ advertiserId: 'AR1', pageToken: 'TOKEN123' });
+    const body = JSON.parse((rpc.mock.calls[0]![1] as string));
+    expect(body['4']).toBe('TOKEN123');
+  });
+
+  it('getAdDetail: GetCreativeById → 미리보기 content.js 에서 YouTube ID 추출', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://preview.example/content.js?x=1' } }] } }),
+    );
+    const get = vi.fn(async () => 'blah blah https://i.ytimg.com/vi/CC740J4UJxw/hqdefault.jpg more');
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+
+    const { detail, apiCalls } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_VID' });
+
+    expect(apiCalls).toBe(0);
+    expect(detail.videoUrl).toBe('https://www.youtube.com/embed/CC740J4UJxw');
+    expect(detail.landingUrl).toBeUndefined(); // 크롤 제한
+    expect(get).toHaveBeenCalledWith('https://preview.example/content.js?x=1');
+  });
+
+  it('getAdDetail: 미리보기에 YouTube 없으면 videoUrl 없이 저장', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    const get = vi.fn(async () => 'no video here');
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR' });
+    expect(detail.videoUrl).toBeUndefined();
+  });
+
+  it('도메인 검색은 미지원(예외)', async () => {
+    const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(), get: vi.fn() });
+    await expect(src.searchAdvertisersByDomain({ domain: 'x.com' })).rejects.toThrow(/회사명 검색/);
+  });
+
+  it('파싱 실패(차단 HTML)는 안내 예외', async () => {
+    const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(async () => '<html>blocked</html>'), get: vi.fn() });
+    await expect(src.listAds({ advertiserId: 'AR1' })).rejects.toThrow(/파싱 실패/);
+  });
+});

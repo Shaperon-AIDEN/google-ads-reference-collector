@@ -93,7 +93,11 @@
 - [x] (후속) **회사명 광고주 검색** — Google 투명성 자동완성 RPC 어댑터(`GoogleTransparencyAdvertiserSearch`) + 대시보드 온보딩 이름/도메인 모드 토글. 회사명으로 후보(id·지역·광고 수) 검색·등록. ⚠️ 비공식 엔드포인트라 429 차단 가능(브라우저 헤더 필요) → best-effort, 확정 경로는 도메인 검색. 단위테스트 3건
 - [x] (후속) **수집 상한** `maxTotal` — 대형 광고주(예: 7000+건) 온디맨드 수집 시 쿼터 폭주 방지
 - [x] **실사용 수집 검증** — 드래프터·아이리스브라이트·더스크랙 이름 검색→등록→수집. 30개 영상 광고 전부 YouTube(썸네일·임베드·조회수 28스냅샷, 최대 870만) 대시보드 표시 확인
+- [x] (후속) **직접 크롤 데이터 소스** `TransparencyCrawlAdsSource` — 투명성 센터 내부 RPC(SearchCreatives·GetCreativeById) curl 호출로 목록·상세 수집(무료, SerpApi 쿼터 0). 미리보기 content.js 에서 YouTube ID 추출. **`ADS_SOURCE=serpapi↔crawl` 설정만으로 스위칭/롤백** (SerpApi 코드 무변경). 헤드리스 브라우저(Playwright)로 실제 요청 형식 캡처해 확정
+- [x] **페이지네이션** — `collectForCompetitor` 가 `nextPageToken` 으로 다중 페이지 수집(전체 수집 지원, maxTotal 상한). 크롤 어댑터 단위테스트 6건
+- [x] **크롤 E2E 검증** — 드래프터 12건 수집, YouTube 10건 추출, **SerpApi 소모 0회** 확인. 제한: 랜딩 URL null, 도메인 검색 미지원(회사명 검색 사용)
 - [ ] (후속) **일괄 등록**: 도메인/회사명 여러 개를 한 번에 입력해 순차 탐색·등록
+- [ ] (후속) 크롤 대량 수집 시 봇 차단 대응(curl-cffi/백오프)·형식 변경 모니터링
 
 ### 조회·관리 화면
 
