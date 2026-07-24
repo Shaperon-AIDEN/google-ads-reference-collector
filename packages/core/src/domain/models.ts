@@ -25,3 +25,9 @@ export interface AdPeriod {
   start: string; // ISO date
   end?: string; // ISO date (미종료 시 없음)
 }
+
+/** 온디맨드 수집 요청 큐 메시지 ("지금 수집" → 백그라운드 처리) */
+export interface CollectRequestMessage {
+  competitorId: string;
+  maxTotal?: number;
+}

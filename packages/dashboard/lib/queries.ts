@@ -26,10 +26,12 @@ export interface AdCard {
   latestViews: number | null;
 }
 
-/** 각 광고의 최신 조회수 스냅샷을 구하는 서브쿼리 (ad_id 별 최댓값 날짜의 view) */
+// 각 광고의 최신 조회수 스냅샷 서브쿼리.
+// ⚠️ Drizzle 의 ${ads.id} 는 한정자 없이 "id" 로 렌더돼 서브쿼리 내 다른 테이블(ad_metrics.id)에
+//    바인딩되는 버그가 있어, 상관 컬럼은 리터럴 SQL(ads.id)로 명시한다.
 const latestViewsSql = sql<number>`(
   SELECT m.yt_view_count FROM ad_metrics m
-  WHERE m.ad_id = ${ads.id}
+  WHERE m.ad_id = ads.id
   ORDER BY m.snapshot_date DESC LIMIT 1
 )`;
 
@@ -144,7 +146,8 @@ export async function listCompetitors(): Promise<CompetitorRow[]> {
       domain: competitors.domain,
       region: competitors.region,
       isActive: competitors.isActive,
-      adCount: sql<number>`(SELECT count(*) FROM ads a WHERE a.competitor_id = ${competitors.id})`,
+      // 상관 컬럼은 리터럴(competitors.id)로 명시 — Drizzle 의 ${} 한정자 누락 버그 회피
+      adCount: sql<number>`(SELECT count(*) FROM ads sub WHERE sub.competitor_id = competitors.id)`,
     })
     .from(competitors)
     .orderBy(desc(competitors.createdAt));
