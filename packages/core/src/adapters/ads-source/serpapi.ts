@@ -3,8 +3,10 @@ import type {
   AdDetail,
   AdListItem,
   AdsSource,
+  AdvertiserCandidate,
   GetAdDetailParams,
   ListAdsParams,
+  SearchAdvertisersParams,
 } from './types.js';
 
 const SERPAPI_BASE = 'https://serpapi.com/search.json';
@@ -117,6 +119,43 @@ export class SerpApiAdsSource implements AdsSource {
     const nextPageToken = asString(pagination.next_page_token);
 
     return { items: items.filter((i) => i.creativeId), nextPageToken, apiCalls: 1 };
+  }
+
+  async searchAdvertisersByDomain(
+    p: SearchAdvertisersParams,
+  ): Promise<{ candidates: AdvertiserCandidate[]; apiCalls: number }> {
+    const params: Record<string, string> = {
+      engine: 'google_ads_transparency_center',
+      text: p.domain,
+    };
+    const region = toSerpApiRegion(p.region);
+    if (region) params.region = region;
+
+    const json = await this.get(params);
+    const creatives = (json.ad_creatives as Json[] | undefined) ?? [];
+
+    // advertiser_id 기준으로 후보를 묶어 광고 수·샘플 썸네일 집계
+    const byId = new Map<string, AdvertiserCandidate>();
+    for (const c of creatives) {
+      const advertiserId = asString(c.advertiser_id);
+      if (!advertiserId) continue;
+      const existing = byId.get(advertiserId);
+      if (existing) {
+        existing.adCount += 1;
+        if (!existing.sampleThumbnail) existing.sampleThumbnail = asString(c.image);
+      } else {
+        byId.set(advertiserId, {
+          advertiserId,
+          advertiser: asString(c.advertiser) ?? advertiserId,
+          adCount: 1,
+          sampleThumbnail: asString(c.image),
+        });
+      }
+    }
+
+    // 광고 수 많은 순으로 정렬 (본사가 대개 상위)
+    const candidates = [...byId.values()].sort((a, b) => b.adCount - a.adCount);
+    return { candidates, apiCalls: 1 };
   }
 
   async getAdDetail(p: GetAdDetailParams): Promise<{ detail: AdDetail; apiCalls: number }> {

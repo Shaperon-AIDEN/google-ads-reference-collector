@@ -35,6 +35,19 @@ export interface ListAdsParams {
   num?: number;
 }
 
+/** 도메인 검색으로 발견한 광고주 후보 (온보딩 선택용) */
+export interface AdvertiserCandidate {
+  advertiserId: string;
+  advertiser: string; // 광고주 표시명
+  adCount: number; // 이 검색에서 관측된 크리에이티브 수
+  sampleThumbnail?: string; // 샘플 이미지(있으면)
+}
+
+export interface SearchAdvertisersParams {
+  domain: string;
+  region?: string;
+}
+
 export interface GetAdDetailParams {
   advertiserId: string;
   creativeId: string;
@@ -51,4 +64,11 @@ export interface AdsSource {
     p: ListAdsParams,
   ): Promise<{ items: AdListItem[]; nextPageToken?: string; apiCalls: number }>;
   getAdDetail(p: GetAdDetailParams): Promise<{ detail: AdDetail; apiCalls: number }>;
+  /**
+   * 도메인으로 광고주를 탐색해 후보 목록을 반환한다 (온보딩용).
+   * 한 도메인에 여러 광고주(본사·지사·대행사)가 나올 수 있어 사용자가 선택한다.
+   */
+  searchAdvertisersByDomain(
+    p: SearchAdvertisersParams,
+  ): Promise<{ candidates: AdvertiserCandidate[]; apiCalls: number }>;
 }

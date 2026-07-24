@@ -34,8 +34,10 @@ export {
   type AdsSource,
   type AdListItem,
   type AdDetail,
+  type AdvertiserCandidate,
   type ListAdsParams,
   type GetAdDetailParams,
+  type SearchAdvertisersParams,
 } from './adapters/ads-source/types.js';
 export { SerpApiAdsSource, type SerpApiConfig } from './adapters/ads-source/serpapi.js';
 export { createAdsSource } from './adapters/ads-source/factory.js';
