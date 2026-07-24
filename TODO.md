@@ -95,7 +95,9 @@
 - [x] **실사용 수집 검증** — 드래프터·아이리스브라이트·더스크랙 이름 검색→등록→수집. 30개 영상 광고 전부 YouTube(썸네일·임베드·조회수 28스냅샷, 최대 870만) 대시보드 표시 확인
 - [x] (후속) **직접 크롤 데이터 소스** `TransparencyCrawlAdsSource` — 투명성 센터 내부 RPC(SearchCreatives·GetCreativeById) curl 호출로 목록·상세 수집(무료, SerpApi 쿼터 0). 미리보기 content.js 에서 YouTube ID 추출. **`ADS_SOURCE=serpapi↔crawl` 설정만으로 스위칭/롤백** (SerpApi 코드 무변경). 헤드리스 브라우저(Playwright)로 실제 요청 형식 캡처해 확정
 - [x] **페이지네이션** — `collectForCompetitor` 가 `nextPageToken` 으로 다중 페이지 수집(전체 수집 지원, maxTotal 상한). 크롤 어댑터 단위테스트 6건
-- [x] **크롤 E2E 검증** — 드래프터 12건 수집, YouTube 10건 추출, **SerpApi 소모 0회** 확인. 제한: 랜딩 URL null, 도메인 검색 미지원(회사명 검색 사용)
+- [x] **크롤 E2E 검증** — 드래프터 12건 수집, **SerpApi 소모 0회** 확인
+- [x] **크롤 추출 개선** — YouTube ID **10→12/12**(`ytimg/vi` URL 형식 + `video_id` 필드 형식 모두 지원), 랜딩 URL best-effort(`destination_url`/`visible_url` 도메인 https 보정), 조회수는 YouTube API로 수집(최대 870만 확인)
+- [x] **크롤 랜딩 한계 확인** — 랜딩은 content.js 에만 있고 렌더가 비결정적이라 일부만 확보(best-effort). `GetCreativeById` 응답엔 랜딩 필드 없음. 안정적 랜딩 필요 시 SerpApi
 - [ ] (후속) **일괄 등록**: 도메인/회사명 여러 개를 한 번에 입력해 순차 탐색·등록
 - [ ] (후속) 크롤 대량 수집 시 봇 차단 대응(curl-cffi/백오프)·형식 변경 모니터링
 

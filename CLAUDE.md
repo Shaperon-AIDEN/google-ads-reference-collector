@@ -82,8 +82,10 @@
   - `serpapi` (기본·안정·유료): `SerpApiAdsSource`. SerpApi 코드는 크롤 도입과 무관하게 유지 → 롤백 경로 안전.
   - `crawl` (무료·비공식·실험적): `TransparencyCrawlAdsSource`. 투명성 센터 내부 RPC 직접 호출(curl).
     - 목록: `SearchService/SearchCreatives`, req `{"2":n,"3":{"12":{"1":"","2":true},"13":{"1":[advertiserId]}},"7":{"1":1,"2":0,"3":region}}`, 페이지네이션=req field `4`(=응답 field `2` 토큰). 응답 item: `2`=creativeId, `4`=format(1/2/3), `6`/`7`=Unix 게재일.
-    - 상세: `LookupService/GetCreativeById` → 미리보기 `content.js` fetch → `ytimg.com/vi/<id>` 정규식으로 YouTube ID 추출.
-    - **제한**: 랜딩 URL 미확보(null), 도메인 검색 미지원(회사명 검색 사용). `apiCalls=0`(쿼터 미소모).
+    - 상세: `LookupService/GetCreativeById` → 미리보기 `content.js` fetch → YouTube ID 추출(`ytimg.com/vi/<id>` URL 형식 + `video_id` 필드 형식 둘 다).
+    - 랜딩: content.js 의 `destination_url`(전체 URL) 우선, 없으면 `visible_url`(도메인은 https 보정). **단 content.js 렌더가 비결정적이라 랜딩은 best-effort(일부만 확보)**. `GetCreativeById` 응답엔 랜딩 필드 없음.
+    - 조회수: 크롤과 무관 — YouTube Data API(무료)로 수집(youtube_video_id 있으면). 투명성 센터는 상업광고 조회수 미제공.
+    - **제한**: 랜딩 URL 불안정(best-effort), 도메인 검색 미지원(회사명 검색 사용). `apiCalls=0`(쿼터 미소모).
     - **리스크**: 비공식·형식 변동 시 조용히 빈 결과, 대량 시 봇 차단 가능, ToS. 깨지면 `ADS_SOURCE=serpapi` 로 롤백.
 - 전체 수집: `collectForCompetitor` 가 `nextPageToken` 으로 페이지네이션(최대 200페이지, `maxTotal` 상한). 크롤은 무료라 전체 수집 실용적.
 

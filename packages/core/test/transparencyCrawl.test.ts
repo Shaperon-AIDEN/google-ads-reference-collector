@@ -39,19 +39,46 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(body['4']).toBe('TOKEN123');
   });
 
-  it('getAdDetail: GetCreativeById → 미리보기 content.js 에서 YouTube ID 추출', async () => {
+  it('getAdDetail: content.js 에서 YouTube ID(URL 형식) + visible_url 랜딩 추출', async () => {
     const rpc = vi.fn(async () =>
       JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://preview.example/content.js?x=1' } }] } }),
     );
-    const get = vi.fn(async () => 'blah blah https://i.ytimg.com/vi/CC740J4UJxw/hqdefault.jpg more');
+    const get = vi.fn(async () =>
+      'x https://i.ytimg.com/vi/CC740J4UJxw/hqdefault.jpg y \\x27visible_url\\x27: \\x27https://cellacure.shop/product?a\\x3d1\\x27',
+    );
     const src = new TransparencyCrawlAdsSource({ rpc, get });
 
     const { detail, apiCalls } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_VID' });
-
     expect(apiCalls).toBe(0);
     expect(detail.videoUrl).toBe('https://www.youtube.com/embed/CC740J4UJxw');
-    expect(detail.landingUrl).toBeUndefined(); // 크롤 제한
-    expect(get).toHaveBeenCalledWith('https://preview.example/content.js?x=1');
+    expect(detail.landingUrl).toBe('https://cellacure.shop/product?a=1'); // \x3d → =
+  });
+
+  it('getAdDetail: video_id 필드 형식(YouTube player media)도 추출', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    const get = vi.fn(async () => "layout: \\x27youtube_player_media_mobile\\x27,\\x27video_id\\x27: \\x27-_e5w77ajvk\\x27");
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR' });
+    expect(detail.videoUrl).toBe('https://www.youtube.com/embed/-_e5w77ajvk');
+  });
+
+  it('getAdDetail: destination_url 우선, visible_url 도메인은 https 보정', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    // visible_url 은 도메인만, destination_url 은 전체 URL
+    const get = vi.fn(async () =>
+      "\\x27visible_url\\x27: \\x27sonusair.kr\\x27,\\x27destination_url\\x27: \\x27https://sonusair.kr/product?a\\x3d1\\x27",
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR' });
+    expect(detail.landingUrl).toBe('https://sonusair.kr/product?a=1');
+  });
+
+  it('getAdDetail: destination_url 없고 visible_url 이 도메인만이면 https 보정', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    const get = vi.fn(async () => "\\x27visible_url\\x27: \\x27sonusair.kr\\x27");
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR' });
+    expect(detail.landingUrl).toBe('https://sonusair.kr');
   });
 
   it('getAdDetail: 미리보기에 YouTube 없으면 videoUrl 없이 저장', async () => {
