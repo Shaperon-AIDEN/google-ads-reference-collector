@@ -10,9 +10,9 @@ export async function collectForCompetitorHttp(
   req: HttpRequest,
   context: InvocationContext,
 ): Promise<HttpResponseInit> {
-  let body: { competitorId?: string };
+  let body: { competitorId?: string; maxTotal?: number };
   try {
-    body = (await req.json()) as { competitorId?: string };
+    body = (await req.json()) as { competitorId?: string; maxTotal?: number };
   } catch {
     return { status: 400, jsonBody: { error: '잘못된 요청' } };
   }
@@ -22,7 +22,9 @@ export async function collectForCompetitorHttp(
 
   const deps = await buildDeps();
   try {
-    const result = await collectForCompetitor(deps, body.competitorId);
+    const result = await collectForCompetitor(deps, body.competitorId, {
+      maxTotal: typeof body.maxTotal === 'number' ? body.maxTotal : undefined,
+    });
     context.log(`[collectForCompetitor] ${result.competitor} new=${result.newAds} inline=${result.processedInline}`);
     return { status: 200, jsonBody: result };
   } catch (err) {

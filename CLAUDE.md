@@ -74,5 +74,11 @@
 - **region:** SerpApi 는 ISO 코드("KR")를 거부하고 **숫자 geo target 코드**를 요구한다(KR=2410, US=2840). `serpapi.ts` 의 `toSerpApiRegion` 이 매핑하며, DB `competitors.region` 은 ISO 코드로 유지한다.
 - **DB 배열 컬럼:** `text[]`(예: `platforms`) 필터는 raw `ANY(${array})` 대신 Drizzle `inArray()` 를 쓴다 (배열 리터럴 직렬화 오류 방지).
 - **상세 "결과 없음":** 일부 크리에이티브는 상세 API 가 "hasn't returned any results" 를 반환한다(영구 조건). `getAdDetail` 은 이 경우 예외 대신 빈 상세(`raw.detailUnavailable`)를 반환해 목록 데이터만으로 저장 — 재시도·포이즌·쿼터 낭비를 막는다.
-- **쿼터 주의:** 광고 N건 수집 = 목록 1 + 상세 N SerpApi 호출. "지금 수집"으로 대형 광고주(40건)를 수집하면 ~41회 소모. Free 250/월 에선 몇 번이면 소진 — 운영은 Developer 5000/월.
+- **쿼터 주의:** 광고 N건 수집 = 목록 1 + 상세 N SerpApi 호출. "지금 수집"으로 대형 광고주(40건)를 수집하면 ~41회 소모. Free 250/월 에선 몇 번이면 소진 — 운영은 Developer 5000/월. 대형 광고주 폭주 방지로 `collectForCompetitor` 에 `maxTotal` 상한 지원.
+
+## 광고주 이름 검색 (Google 투명성 자동완성)
+
+- 회사명 → 광고주 후보는 **Google 투명성 센터 내부 RPC** `SearchService/SearchSuggestions` 로 얻는다(`GoogleTransparencyAdvertiserSearch`). SerpApi 는 회사명 검색 미지원.
+- 요청: `f.req={"1":<회사명>,"2":<limit>}`. 응답 필드번호 매핑: `1[].1.1`=이름, `.2`=advertiser_id, `.3`=지역, `.4.2`={low,high}=광고 수.
+- **비공식·불안정:** 브라우저 헤더(user-agent·origin·referer) 없으면 429. undici(Node) 는 TLS 시그니처로도 차단될 수 있어 과도한 호출 시 실패 → best-effort 로만 사용, 캐시·백오프 권장. 확정 경로는 도메인 검색(SerpApi).
 - **Azurite:** Azure SDK 최신 API 버전 미지원 시 `--skipApiVersionCheck` 필요 (docker-compose 반영됨).

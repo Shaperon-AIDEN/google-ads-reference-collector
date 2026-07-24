@@ -56,3 +56,8 @@ export { createBlobStore } from './adapters/blob/factory.js';
 export { type YouTubeClient, type VideoStats } from './adapters/youtube/types.js';
 export { YouTubeDataApiClient, type YouTubeConfig } from './adapters/youtube/youtubeDataApi.js';
 export { createYouTubeClient } from './adapters/youtube/factory.js';
+
+// 어댑터 — advertiser search (광고주 이름 자동완성)
+export { type AdvertiserSearch, type AdvertiserSuggestion } from './adapters/advertiser-search/types.js';
+export { GoogleTransparencyAdvertiserSearch } from './adapters/advertiser-search/googleTransparency.js';
+export { createAdvertiserSearch } from './adapters/advertiser-search/factory.js';
