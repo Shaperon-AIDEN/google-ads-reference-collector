@@ -26,6 +26,9 @@ const envSchema = z.object({
   // 인증
   AUTH_MODE: z.enum(['mock', 'entra']).default('mock'),
 
+  // 대시보드가 온디맨드 수집을 위해 호출하는 Functions HTTP 엔드포인트 베이스 URL
+  FUNCTIONS_BASE_URL: z.string().default('http://localhost:7071/api'),
+
   // 스케줄 (CRON)
   AD_LIST_CRON: z.string().default('0 0 0,12 * * *'),
   VIEW_COUNT_CRON: z.string().default('0 0 3 * * *'),

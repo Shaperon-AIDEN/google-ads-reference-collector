@@ -16,6 +16,25 @@ interface Row {
 export default function CompetitorList({ competitors }: { competitors: Row[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function collectNow(row: Row) {
+    setBusy(row.id);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/competitors/${row.id}/collect`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '수집 실패');
+      setNotice(
+        `'${row.name}' 수집: 신규 ${data.newAds ?? 0}건 (즉시 처리 ${data.processedInline ?? 0}, 대기 ${data.enqueued ?? 0})`,
+      );
+      router.refresh();
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function toggleActive(row: Row) {
     setBusy(row.id);
@@ -41,6 +60,8 @@ export default function CompetitorList({ competitors }: { competitors: Row[] }) 
   }
 
   return (
+    <>
+    {notice && <p className="muted" style={{ marginTop: 0 }}>{notice}</p>}
     <table>
       <thead>
         <tr>
@@ -66,6 +87,9 @@ export default function CompetitorList({ competitors }: { competitors: Row[] }) 
             </td>
             <td>
               <div className="row">
+                <button disabled={busy === c.id} onClick={() => collectNow(c)}>
+                  {busy === c.id ? '수집 중…' : '지금 수집'}
+                </button>
                 <button className="secondary" disabled={busy === c.id} onClick={() => toggleActive(c)}>
                   {c.isActive ? '중지' : '재개'}
                 </button>
@@ -78,5 +102,6 @@ export default function CompetitorList({ competitors }: { competitors: Row[] }) 
         ))}
       </tbody>
     </table>
+    </>
   );
 }

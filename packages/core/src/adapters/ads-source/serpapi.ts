@@ -90,6 +90,12 @@ export class SerpApiAdsSource implements AdsSource {
     return json;
   }
 
+  /** "결과 없음" 은 영구 조건 → 재시도 무의미. 이 패턴만 별도 판별한다. */
+  private static isNoResults(err: unknown): boolean {
+    const m = err instanceof Error ? err.message : String(err);
+    return /returned any results|hasn't returned|결과/i.test(m);
+  }
+
   async listAds(
     p: ListAdsParams,
   ): Promise<{ items: AdListItem[]; nextPageToken?: string; apiCalls: number }> {
@@ -159,11 +165,21 @@ export class SerpApiAdsSource implements AdsSource {
   }
 
   async getAdDetail(p: GetAdDetailParams): Promise<{ detail: AdDetail; apiCalls: number }> {
-    const json = await this.get({
-      engine: 'google_ads_transparency_center_ad_details',
-      advertiser_id: p.advertiserId,
-      creative_id: p.creativeId,
-    });
+    let json: Json;
+    try {
+      json = await this.get({
+        engine: 'google_ads_transparency_center_ad_details',
+        advertiser_id: p.advertiserId,
+        creative_id: p.creativeId,
+      });
+    } catch (err) {
+      // 상세 "결과 없음" 은 영구 조건 → 재시도/포이즌 대신 빈 상세로 반환해
+      // 목록 데이터만으로 광고를 저장하게 한다 (쿼터 낭비 방지).
+      if (SerpApiAdsSource.isNoResults(err)) {
+        return { detail: { creativeId: p.creativeId, raw: { detailUnavailable: true } }, apiCalls: 1 };
+      }
+      throw err;
+    }
 
     // 상세는 ad_creatives 배열(변형)로 온다. 첫 변형을 대표로 사용한다.
     const variations = (json.ad_creatives as Json[] | undefined) ?? [];
