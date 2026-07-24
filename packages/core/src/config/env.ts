@@ -10,8 +10,8 @@ const envSchema = z.object({
   // Azure Storage — 로컬은 "UseDevelopmentStorage=true" (Azurite)
   AzureWebJobsStorage: z.string().default('UseDevelopmentStorage=true'),
 
-  // 외부 데이터 소스
-  ADS_SOURCE: z.enum(['serpapi']).default('serpapi'),
+  // 외부 데이터 소스 — serpapi(안정, 유료) / crawl(무료, 비공식·실험적). 롤백은 이 값만 변경.
+  ADS_SOURCE: z.enum(['serpapi', 'crawl']).default('serpapi'),
   SERPAPI_KEY: z.string().optional(),
   YOUTUBE_API_KEY: z.string().optional(),
 

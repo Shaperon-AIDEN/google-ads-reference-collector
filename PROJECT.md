@@ -57,7 +57,8 @@ Azure 리소스를 먼저 프로비저닝하지 않고, **로컬 환경에서 �
 - **사내 통합:** Microsoft 365 / Entra ID 계정 SSO, 단일 구독으로 비용·권한·보안 정책 통합 관리
 
 ### 불변 항목 (v1.0 대비 변경 없음)
-- 외부 데이터 소스: **SerpApi (Ads Transparency API)**, **YouTube Data API v3**
+- 외부 데이터 소스: **SerpApi (Ads Transparency API)** — 기본·안정·유료. **YouTube Data API v3**
+  - 대안: `ADS_SOURCE=crawl` 로 **투명성 센터 직접 크롤(무료·비공식·실험적)** 선택 가능. 롤백은 `ADS_SOURCE=serpapi` 설정만 변경(코드 무변경). 크롤 제한: 랜딩 URL 미확보·도메인 검색 미지원·형식 변동/차단 리스크 (CLAUDE.md 참조)
 - DB 스키마: PostgreSQL 유지
 - 수집 파이프라인 로직, 대시보드 기능 명세
 - 개발 언어: **TypeScript**

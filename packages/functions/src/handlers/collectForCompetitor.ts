@@ -1,4 +1,4 @@
-import type { NewAdQueueMessage } from '@adref/core';
+import type { AdListItem, NewAdQueueMessage } from '@adref/core';
 import type { HandlerDeps } from './context.js';
 import { collectAdDetail } from './collectAdDetail.js';
 
@@ -50,18 +50,34 @@ export async function collectForCompetitor(
       };
     }
 
-    const { items, apiCalls: listCalls } = await ads.listAds({
-      advertiserId: competitor.advertiserId,
-      region: competitor.region,
-    });
-    apiCalls += listCalls;
-    quota.record(listCalls);
+    // 페이지네이션으로 신규 비디오 광고를 maxTotal 만큼 모은다 (전체 수집 지원).
+    // 크롤 소스는 apiCalls=0(무료)이라 페이지를 많이 넘겨도 쿼터 무관.
+    const MAX_PAGES = 200; // 안전 상한
+    const fresh: AdListItem[] = [];
+    let pageToken: string | undefined;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      if (!quota.canCall()) {
+        throttled = true;
+        break;
+      }
+      const { items, nextPageToken, apiCalls: listCalls } = await ads.listAds({
+        advertiserId: competitor.advertiserId,
+        region: competitor.region,
+        pageToken,
+      });
+      apiCalls += listCalls;
+      quota.record(listCalls);
 
-    // 스코프: 비디오 광고만 수집
-    const videoItems = items.filter((i) => i.format === 'video');
-    const existing = await repos.ads.existingCreativeIds(videoItems.map((i) => i.creativeId));
-    // 상한 적용 — 대형 광고주도 이번 실행에서 maxTotal 건까지만 처리
-    const fresh = videoItems.filter((i) => !existing.has(i.creativeId)).slice(0, maxTotal);
+      // 스코프: 비디오 광고만
+      const video = items.filter((i) => i.format === 'video');
+      const existing = await repos.ads.existingCreativeIds(video.map((i) => i.creativeId));
+      for (const it of video) if (!existing.has(it.creativeId)) fresh.push(it);
+
+      if (fresh.length >= maxTotal || !nextPageToken) break;
+      pageToken = nextPageToken;
+    }
+    // 상한 적용
+    fresh.length = Math.min(fresh.length, maxTotal);
 
     for (let i = 0; i < fresh.length; i++) {
       const item = fresh[i]!;

@@ -6,6 +6,7 @@
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "DATABASE_URL": "postgres://adref:adref@localhost:5432/adref",
     "ADS_SOURCE": "serpapi",
+    "_ADS_SOURCE_note": "serpapi(안정·유료) | crawl(무료·비공식). 롤백은 이 값을 serpapi 로 변경",
     "SERPAPI_KEY": "<local dev key>",
     "YOUTUBE_API_KEY": "<local dev key>",
     "AD_QUEUE_NAME": "new-ads",

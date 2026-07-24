@@ -40,6 +40,7 @@ export {
   type SearchAdvertisersParams,
 } from './adapters/ads-source/types.js';
 export { SerpApiAdsSource, type SerpApiConfig } from './adapters/ads-source/serpapi.js';
+export { TransparencyCrawlAdsSource, type CrawlTransport } from './adapters/ads-source/transparencyCrawl.js';
 export { createAdsSource } from './adapters/ads-source/factory.js';
 
 // 어댑터 — queue
