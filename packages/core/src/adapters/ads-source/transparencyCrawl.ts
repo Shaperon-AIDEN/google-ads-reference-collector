@@ -41,12 +41,42 @@ function daysBetween(first?: string, last?: string): number | undefined {
   if (Number.isNaN(a) || Number.isNaN(b)) return undefined;
   return Math.max(0, Math.round((b - a) / 86_400_000)) + 1;
 }
-/** content.js 미리보기에서 YouTube video ID 추출 */
+/** content.js 미리보기에서 YouTube video ID 추출 (URL 형식 + video_id 필드 형식 모두) */
 function extractYouTubeId(html: string): string | undefined {
-  const m = html.match(
-    /(?:ytimg\.com\/vi\/|youtube\.com\/embed\/|youtu\.be\/|youtube(?:-nocookie)?\.com\/watch\?v=)([A-Za-z0-9_-]{11})/,
+  const url = html.match(
+    /(?:ytimg\.com\/vi\/|youtube(?:-nocookie)?\.com\/embed\/|youtu\.be\/|youtube(?:-nocookie)?\.com\/watch\?v=)([A-Za-z0-9_-]{11})/,
   );
-  return m?.[1];
+  if (url?.[1]) return url[1];
+  // YouTube player media 레이아웃: \x27video_id\x27: \x27<id>\x27 또는 "video_id":"<id>"
+  const field = html.match(/video_id(?:\\x27|["'])?\s*:?\s*(?:\\x27|["'])([A-Za-z0-9_-]{11})/);
+  return field?.[1];
+}
+
+/** \xNN 16진 이스케이프 복원 */
+function unescapeHex(s: string): string {
+  return s.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+/** content.js 미리보기에서 특정 필드 값 추출 (이스케이프/평문 형식 모두) */
+function fieldValue(html: string, field: string): string | undefined {
+  let m = html.match(new RegExp(`${field}\\\\x27\\s*:\\s*\\\\x27(.*?)\\\\x27`));
+  if (!m) m = html.match(new RegExp(`["']${field}["']\\s*:\\s*["']([^"']+)["']`));
+  return m?.[1] ? unescapeHex(m[1]).trim() : undefined;
+}
+
+/**
+ * 랜딩 URL 추출. destination_url(전체 클릭연결) 우선, 없으면 visible_url(전체 URL 또는 도메인).
+ * 도메인만 있으면 https 를 붙여 반환한다. landing_domain 은 핸들러가 landingDomain() 으로 계산.
+ */
+function extractLandingUrl(html: string): string | undefined {
+  const dest = fieldValue(html, 'destination_url');
+  if (dest && /^https?:\/\//i.test(dest)) return dest;
+  const visible = fieldValue(html, 'visible_url');
+  if (visible) {
+    if (/^https?:\/\//i.test(visible)) return visible;
+    if (/^[a-z0-9.-]+\.[a-z]{2,}/i.test(visible)) return `https://${visible}`;
+  }
+  return undefined;
 }
 
 /**
@@ -144,22 +174,20 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     const previewUrl = ((variations[0]?.['1'] as Json | undefined)?.['4'] as string | undefined) ?? undefined;
 
     let videoUrl: string | undefined;
+    let landingUrl: string | undefined;
     if (previewUrl) {
       try {
-        const ytId = extractYouTubeId(await this.t.get(previewUrl));
+        const html = await this.t.get(previewUrl);
+        const ytId = extractYouTubeId(html);
         if (ytId) videoUrl = `https://www.youtube.com/embed/${ytId}`;
+        landingUrl = extractLandingUrl(html); // visible_url → 랜딩. landing_domain 은 핸들러가 계산
       } catch {
         // 미리보기 fetch 실패는 상세 저장을 막지 않는다
       }
     }
 
     return {
-      detail: {
-        creativeId: p.creativeId,
-        videoUrl,
-        landingUrl: undefined, // 크롤에서는 랜딩 URL 미확보 (제한)
-        raw: json,
-      },
+      detail: { creativeId: p.creativeId, videoUrl, landingUrl, raw: json },
       apiCalls: 0,
     };
   }
