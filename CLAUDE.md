@@ -80,5 +80,6 @@
 
 - 회사명 → 광고주 후보는 **Google 투명성 센터 내부 RPC** `SearchService/SearchSuggestions` 로 얻는다(`GoogleTransparencyAdvertiserSearch`). SerpApi 는 회사명 검색 미지원.
 - 요청: `f.req={"1":<회사명>,"2":<limit>}`. 응답 필드번호 매핑: `1[].1.1`=이름, `.2`=advertiser_id, `.3`=지역, `.4.2`={low,high}=광고 수.
-- **비공식·불안정:** 브라우저 헤더(user-agent·origin·referer) 없으면 429. undici(Node) 는 TLS 시그니처로도 차단될 수 있어 과도한 호출 시 실패 → best-effort 로만 사용, 캐시·백오프 권장. 확정 경로는 도메인 검색(SerpApi).
+- **전송은 curl 서브프로세스**: Google 은 Node(undici·https)의 TLS 시그니처를 봇으로 탐지·차단하므로, `execFile('curl', [...])`(셸 미경유·인젝션 안전)로 호출한다. curl 은 dev(macOS)·Azure App Service(Linux)에 기본 포함. 테스트는 `transport` 주입으로 파서만 검증.
+- **비공식:** 브라우저 헤더(user-agent·origin·referer) 필요. 여전히 best-effort — 확정 경로는 도메인 검색(SerpApi).
 - **Azurite:** Azure SDK 최신 API 버전 미지원 시 `--skipApiVersionCheck` 필요 (docker-compose 반영됨).
