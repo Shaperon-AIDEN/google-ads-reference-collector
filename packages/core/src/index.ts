@@ -59,5 +59,5 @@ export { createYouTubeClient } from './adapters/youtube/factory.js';
 
 // 어댑터 — advertiser search (광고주 이름 자동완성)
 export { type AdvertiserSearch, type AdvertiserSuggestion } from './adapters/advertiser-search/types.js';
-export { GoogleTransparencyAdvertiserSearch } from './adapters/advertiser-search/googleTransparency.js';
+export { GoogleTransparencyAdvertiserSearch, type SuggestTransport } from './adapters/advertiser-search/googleTransparency.js';
 export { createAdvertiserSearch } from './adapters/advertiser-search/factory.js';
