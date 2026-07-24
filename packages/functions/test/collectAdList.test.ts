@@ -28,6 +28,25 @@ describe('collectAdList', () => {
     expect(repos.finishedRuns[0]).toMatchObject({ status: 'success', newAdsCount: 2 });
   });
 
+  it('비디오 광고만 큐에 적재하고 이미지·텍스트는 무시', async () => {
+    const queue = new FakeQueue();
+    const ads = new FakeAdsSource({
+      AR1: [
+        { creativeId: 'V1', advertiserId: 'AR1', format: 'video' },
+        { creativeId: 'IMG1', advertiserId: 'AR1', format: 'image' },
+        { creativeId: 'TXT1', advertiserId: 'AR1', format: 'text' },
+        { creativeId: 'V2', advertiserId: 'AR1', format: 'video' },
+      ],
+    });
+    const repos = fakeRepos({ competitors: [{ id: 'c1', advertiserId: 'AR1', region: 'KR' }] });
+    const deps = makeDeps({ queue, ads, repos: repos as never });
+
+    const result = await collectAdList(deps);
+
+    expect(result.newAds).toBe(2); // V1, V2 만
+    expect(queue.messages.map((m) => (m.body as { creativeId: string }).creativeId)).toEqual(['V1', 'V2']);
+  });
+
   it('쿼터 임계치 도달 시 이후 경쟁사를 건너뛰고 partial', async () => {
     const queue = new FakeQueue();
     const ads = new FakeAdsSource({ AR1: [item('CR1')], AR2: [item('CR2')] });

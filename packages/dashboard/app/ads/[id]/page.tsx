@@ -30,7 +30,19 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
             />
           </div>
         ) : (
-          <p className="muted">이 광고는 영상(YouTube)이 없습니다. 형식: {ad.format}</p>
+          // 비-YouTube 영상: 스트림 URL 이 만료되므로 임베드 대신 투명성 센터 원본 링크 제공
+          <div>
+            <p className="muted">YouTube 외 영상은 원본 링크로 확인합니다 (스트림 URL 은 만료될 수 있음).</p>
+            <div className="row">
+              <a
+                href={`https://adstransparency.google.com/advertiser/${ad.advertiserId}/creative/${ad.creativeId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <button>투명성 센터에서 영상 보기 ↗</button>
+              </a>
+            </div>
+          </div>
         )}
       </div>
 

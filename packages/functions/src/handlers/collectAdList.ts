@@ -37,9 +37,10 @@ export async function collectAdList(deps: HandlerDeps): Promise<CollectAdListRes
       apiCalls += calls;
       quota.record(calls);
 
-      const creativeIds = items.map((i) => i.creativeId);
-      const existing = await repos.ads.existingCreativeIds(creativeIds);
-      const fresh = items.filter((i) => !existing.has(i.creativeId));
+      // 스코프: 비디오 광고만 수집 (이미지·텍스트 무시 → 상세 API 쿼터 절감)
+      const videoItems = items.filter((i) => i.format === 'video');
+      const existing = await repos.ads.existingCreativeIds(videoItems.map((i) => i.creativeId));
+      const fresh = videoItems.filter((i) => !existing.has(i.creativeId));
 
       for (const item of fresh) {
         const msg: NewAdQueueMessage = {

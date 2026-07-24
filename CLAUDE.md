@@ -54,6 +54,12 @@
 - 브랜치 ref 는 병합 후 삭제해도 무방하다 — 커밋은 merge commit 을 통해 main 에 보존된다.
 - 작업은 `feature/*`·`fix/*`·`chore/*` 브랜치에서 하고 main 직접 push 는 금지 (전역 브랜치 정책).
 
+## 수집 스코프 (중요)
+
+- **비디오 광고만 수집한다.** 이미지·텍스트 광고는 대상이 아니다 — 목록 수집 단계에서 `format === 'video'` 만 신규 감지·큐 적재·저장한다.
+- 대시보드 영상 재생은 **YouTube 영상만** 지원(임베드). 비-YouTube 영상(googlevideo 스트림 URL)은 만료되므로 재생 대신 원본 링크(투명성 센터)만 제공한다.
+- 영상 원본 파일은 저장하지 않는다 (URL 만 확보).
+
 ## 규칙
 
 - 시크릿(SerpApi·YouTube 키)은 코드/문서에 하드코딩 금지. 로컬은 `.env`/`local.settings.json`, Azure는 Key Vault.

@@ -55,8 +55,10 @@ export async function collectForCompetitor(
     apiCalls += listCalls;
     quota.record(listCalls);
 
-    const existing = await repos.ads.existingCreativeIds(items.map((i) => i.creativeId));
-    const fresh = items.filter((i) => !existing.has(i.creativeId));
+    // 스코프: 비디오 광고만 수집
+    const videoItems = items.filter((i) => i.format === 'video');
+    const existing = await repos.ads.existingCreativeIds(videoItems.map((i) => i.creativeId));
+    const fresh = videoItems.filter((i) => !existing.has(i.creativeId));
 
     for (let i = 0; i < fresh.length; i++) {
       const item = fresh[i]!;
