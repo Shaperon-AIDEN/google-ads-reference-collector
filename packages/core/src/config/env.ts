@@ -17,6 +17,7 @@ const envSchema = z.object({
 
   // 큐 / Blob
   AD_QUEUE_NAME: z.string().default('new-ads'),
+  COLLECT_QUEUE_NAME: z.string().default('collect-requests'),
   BLOB_CONTAINER: z.string().default('thumbnails'),
 
   // 쿼터 가드

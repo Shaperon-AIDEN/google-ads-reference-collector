@@ -24,7 +24,7 @@ export { AdMetricRepository } from './db/repositories/adMetrics.js';
 export { CollectionRunRepository } from './db/repositories/collectionRuns.js';
 
 // 도메인
-export type { AdFormat, AdPeriod, NewAdQueueMessage } from './domain/models.js';
+export type { AdFormat, AdPeriod, NewAdQueueMessage, CollectRequestMessage } from './domain/models.js';
 export { parseYouTubeId } from './domain/parseYouTubeId.js';
 export { landingDomain } from './domain/landingDomain.js';
 export { QuotaGuard } from './domain/quotaGuard.js';

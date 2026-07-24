@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { listCompetitors } from '@/lib/queries';
 
+// 폴링으로 최신 광고 수를 받아야 하므로 캐시 금지 (라우트 응답 정적 캐싱 방지)
+export const dynamic = 'force-dynamic';
+
 /** GET /api/competitors — 전체 경쟁사 목록(수집 광고 수 포함) */
 export async function GET() {
   return NextResponse.json({ competitors: await listCompetitors() });

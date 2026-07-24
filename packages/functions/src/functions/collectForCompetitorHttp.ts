@@ -1,10 +1,12 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
-import { buildDeps } from '../handlers/context.js';
-import { collectForCompetitor } from '../handlers/collectForCompetitor.js';
+import { createQueueClient, loadEnv, type CollectRequestMessage } from '@adref/core';
 
 /**
- * 온디맨드 수집 HTTP 트리거 — 대시보드 "지금 수집" 버튼이 호출.
- * POST /api/collectForCompetitor  { competitorId }
+ * 온디맨드 수집 트리거 (HTTP) — 대시보드 "지금 수집" 버튼이 호출.
+ * 실제 수집은 시간이 걸리므로 여기서는 **큐에 요청만 적재하고 즉시 반환**한다.
+ * 백그라운드의 collectRequestProcessor(Queue Trigger)가 이어받아 처리하므로,
+ * 사용자가 페이지를 벗어나도 수집은 완료된다.
+ * POST /api/collectForCompetitor  { competitorId, maxTotal? }
  */
 export async function collectForCompetitorHttp(
   req: HttpRequest,
@@ -20,19 +22,17 @@ export async function collectForCompetitorHttp(
     return { status: 400, jsonBody: { error: 'competitorId 필요' } };
   }
 
-  const deps = await buildDeps();
-  try {
-    const result = await collectForCompetitor(deps, body.competitorId, {
-      maxTotal: typeof body.maxTotal === 'number' ? body.maxTotal : undefined,
-    });
-    context.log(`[collectForCompetitor] ${result.competitor} new=${result.newAds} inline=${result.processedInline}`);
-    return { status: 200, jsonBody: result };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { status: 502, jsonBody: { error: message } };
-  } finally {
-    await deps.close();
-  }
+  const env = loadEnv();
+  const queue = createQueueClient(env);
+  const msg: CollectRequestMessage = {
+    competitorId: body.competitorId,
+    // 한 번의 "지금 수집"은 기본 100건까지 (무제한 방지 — 반복 클릭으로 더 수집).
+    // SerpApi 롤백 시 쿼터 폭주도 예방.
+    maxTotal: typeof body.maxTotal === 'number' ? body.maxTotal : 100,
+  };
+  await queue.enqueue(env.COLLECT_QUEUE_NAME, msg);
+  context.log(`[collectForCompetitor] queued competitorId=${msg.competitorId}`);
+  return { status: 202, jsonBody: { queued: true } };
 }
 
 app.http('collectForCompetitor', {

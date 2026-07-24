@@ -10,6 +10,7 @@
     "SERPAPI_KEY": "<local dev key>",
     "YOUTUBE_API_KEY": "<local dev key>",
     "AD_QUEUE_NAME": "new-ads",
+    "COLLECT_QUEUE_NAME": "collect-requests",
     "BLOB_CONTAINER": "thumbnails",
     "QUOTA_MONTHLY_BUDGET": "5000",
     "QUOTA_THROTTLE_PCT": "0.8",
