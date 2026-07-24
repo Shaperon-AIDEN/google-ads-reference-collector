@@ -194,7 +194,8 @@ flowchart LR
 > 각 경쟁사(도메인)를 하나씩 추가해 리스트를 키운다. 등록된 활성 경쟁사는 모두 자동 수집된다.
 
 **구성요소 추가:**
-- **어댑터** — `AdsSource` 인터페이스에 `searchAdvertisersByDomain(domain, region?)` 추가. SerpApi 구현은 도메인 검색 응답의 `advertiser_id`·`advertiser` 를 중복 제거해 후보 목록으로 반환 (호출당 SerpApi 1회).
+- **광고주 이름 검색(기본)** — `AdvertiserSearch.searchByName(name)` : Google 투명성 센터의 자동완성(SearchSuggestions) 내부 RPC 로 회사명 → 광고주 후보(id·이름·지역·광고 수). SerpApi 쿼터 미사용. ⚠️ **비공식 엔드포인트** — 브라우저 헤더 필요, 과도한 자동 호출 시 429 로 차단되므로 best-effort(캐시·백오프 권장). 안정 경로는 아래 도메인 검색.
+- **광고주 도메인 검색(대안)** — `AdsSource.searchAdvertisersByDomain(domain, region?)` : SerpApi 도메인 검색 응답의 `advertiser_id`·`advertiser` 중복 제거 (호출당 SerpApi 1회, 안정적).
 - **대시보드(App Service)** — "경쟁사 추가" 화면: 도메인 입력 → 후보 조회(route handler `POST /api/competitors/search`) → 후보 선택 → 등록(`POST /api/competitors`). 서버 측에서만 SerpApi 키 사용.
 - **수집 연계** — 등록 즉시는 기존 `collectAdList`(활성 경쟁사 순회)가 다음 주기에 자동 반영. **즉시 첫 수집**은 온디맨드 트리거로 지원: HTTP 트리거 Function `collectForCompetitor`(단일 광고주 목록 수집→큐 적재)를 대시보드가 호출. (MVP 는 스케줄 자동 반영, 즉시 수집은 후속 개선)
 

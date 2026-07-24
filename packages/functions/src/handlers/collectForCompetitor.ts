@@ -20,10 +20,12 @@ export interface CollectForCompetitorResult {
 export async function collectForCompetitor(
   deps: HandlerDeps,
   competitorId: string,
-  opts: { maxInline?: number } = {},
+  opts: { maxInline?: number; maxTotal?: number } = {},
 ): Promise<CollectForCompetitorResult> {
   const { ads, queue, repos, quota, env } = deps;
   const maxInline = opts.maxInline ?? 8;
+  // 쿼터 보호 상한 — 초과분은 이번 실행에서 처리하지 않는다 (대형 광고주 폭주 방지)
+  const maxTotal = opts.maxTotal ?? Infinity;
   const run = await repos.runs.start('list');
 
   let apiCalls = 0;
@@ -58,7 +60,8 @@ export async function collectForCompetitor(
     // 스코프: 비디오 광고만 수집
     const videoItems = items.filter((i) => i.format === 'video');
     const existing = await repos.ads.existingCreativeIds(videoItems.map((i) => i.creativeId));
-    const fresh = videoItems.filter((i) => !existing.has(i.creativeId));
+    // 상한 적용 — 대형 광고주도 이번 실행에서 maxTotal 건까지만 처리
+    const fresh = videoItems.filter((i) => !existing.has(i.creativeId)).slice(0, maxTotal);
 
     for (let i = 0; i < fresh.length; i++) {
       const item = fresh[i]!;
