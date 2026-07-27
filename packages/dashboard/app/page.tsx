@@ -281,6 +281,9 @@ async function GroupedView({
           </section>
         ))
       )}
+      <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
+        조회수가 확인되지 않는 영상(비-YouTube·비공개·삭제)은 목록에서 제외됩니다.
+      </p>
     </>
   );
 }

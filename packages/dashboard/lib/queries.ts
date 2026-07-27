@@ -58,7 +58,9 @@ const latestLikesSql = sql<number>`(
 
 /** 레퍼런스 리스트 (메인) — 경쟁사명 조인 + 최신 조회수, 정렬·필터 */
 export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
-  const conds = [];
+  // 조회수가 확인되지 않는 영상(비-YouTube·비공개·삭제·미스냅샷)은 목록에서 숨긴다.
+  // (데이터는 보존 — 이후 조회수가 잡히면 자동으로 다시 노출)
+  const conds = [sql`${latestViewsSql} IS NOT NULL`];
   if (filter.competitorId) conds.push(eq(ads.competitorId, filter.competitorId));
   if (filter.format) conds.push(eq(ads.format, filter.format));
   if (filter.minViews && filter.minViews > 0) {
