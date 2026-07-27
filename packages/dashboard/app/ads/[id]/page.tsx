@@ -14,7 +14,15 @@ function fmtShort(v: number): string {
 }
 
 /** 일별 증가량 꺾은선 그래프 (SVG, 서버 렌더) */
-function DailyGrowthChart({ points }: { points: Array<{ date: string; delta: number }> }) {
+function DailyGrowthChart({
+  points,
+  color = 'var(--accent)',
+  label = '일별 증가량',
+}: {
+  points: Array<{ date: string; delta: number }>;
+  color?: string;
+  label?: string;
+}) {
   const W = 680;
   const H = 240;
   const padL = 52;
@@ -32,7 +40,7 @@ function DailyGrowthChart({ points }: { points: Array<{ date: string; delta: num
   const ticks = [0, 0.5, 1].map((f) => Math.round(maxDelta * f));
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }} role="img" aria-label="일별 조회수 증가량">
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }} role="img" aria-label={label}>
       {/* Y축 눈금·격자 */}
       {ticks.map((t) => (
         <g key={t}>
@@ -43,11 +51,11 @@ function DailyGrowthChart({ points }: { points: Array<{ date: string; delta: num
         </g>
       ))}
       {/* 증가량 라인 */}
-      <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" />
+      <path d={line} fill="none" stroke={color} strokeWidth="2" />
       {/* 점 + 값 라벨 + 날짜 */}
       {points.map((p, i) => (
         <g key={p.date}>
-          <circle cx={x(i)} cy={y(p.delta)} r="3.5" fill="var(--accent)" />
+          <circle cx={x(i)} cy={y(p.delta)} r="3.5" fill={color} />
           <text x={x(i)} y={y(p.delta) - 8} textAnchor="middle" fontSize="11" fill="var(--text)">
             ▲{fmtShort(p.delta)}
           </text>
@@ -70,6 +78,15 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
     const prev = ad.metrics[i - 1]!.views ?? 0;
     const cur = ad.metrics[i]!.views ?? 0;
     deltas.push({ date: ad.metrics[i]!.date, delta: Math.max(0, cur - prev) });
+  }
+
+  // 좋아요: 총 좋아요(최신 스냅샷) + 일별 증가량 (조회수와 동일 원리)
+  const latestLikes = [...ad.metrics].reverse().find((m) => m.likes != null)?.likes ?? null;
+  const likeDeltas: Array<{ date: string; delta: number }> = [];
+  for (let i = 1; i < ad.metrics.length; i++) {
+    const prev = ad.metrics[i - 1]!.likes ?? 0;
+    const cur = ad.metrics[i]!.likes ?? 0;
+    likeDeltas.push({ date: ad.metrics[i]!.date, delta: Math.max(0, cur - prev) });
   }
 
   return (
@@ -108,6 +125,7 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
           <tbody>
             <tr><th>게재 기간</th><td>{ad.firstShown ?? '—'} ~ {ad.lastShown ?? '—'} ({ad.daysShown ?? '—'}일)</td></tr>
             <tr><th>총 조회수</th><td>{fmt(ad.latestViews)}</td></tr>
+            <tr><th>총 좋아요</th><td>{fmt(latestLikes)}</td></tr>
             <tr><th>랜딩 URL</th><td>{ad.landingUrl ? <a href={ad.landingUrl} target="_blank" rel="noreferrer">{ad.landingUrl}</a> : '—'}</td></tr>
             <tr><th>랜딩 도메인</th><td>{ad.landingDomain ?? '—'}</td></tr>
             <tr><th>크리에이티브 ID</th><td style={{ fontFamily: 'monospace', fontSize: 12 }}>{ad.creativeId}</td></tr>
@@ -124,7 +142,20 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
         </p>
       ) : (
         <div className="panel">
-          <DailyGrowthChart points={deltas} />
+          <DailyGrowthChart points={deltas} label="일별 조회수 증가량" />
+        </div>
+      )}
+
+      <h2>일별 좋아요 증가량</h2>
+      {likeDeltas.length === 0 || likeDeltas.every((p) => p.delta === 0) ? (
+        <p className="muted">
+          {ad.metrics.length < 2
+            ? '일별 좋아요 증가량은 스냅샷이 2개 이상 쌓이면 표시됩니다. (매일 자동 수집으로 누적)'
+            : '집계 기간 동안 좋아요 증가가 없습니다. (좋아요 비공개 영상은 표시되지 않을 수 있음)'}
+        </p>
+      ) : (
+        <div className="panel">
+          <DailyGrowthChart points={likeDeltas} color="#e0245e" label="일별 좋아요 증가량" />
         </div>
       )}
     </>
