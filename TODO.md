@@ -69,6 +69,7 @@
 - [x] **`func start` 로 3개 트리거 실기동 검증** (Azure Functions Core Tools 4.12.1) — timer 2종·queue 1종 등록, `%AD_QUEUE_NAME%`/`%*_CRON%` 앱설정 주입 확인
 - [x] **Queue Trigger 자동 소비** 검증 — 유효 메시지 자동 소비→DB 저장(Succeeded), Timer 트리거 admin 실행→collection_runs 기록
 - [x] **포이즌 큐 실측** — 실패 메시지 정확히 5회 재시도 후 `new-ads`→`new-ads-poison` 자동 이동(`MaxDequeueCount of 5`) 확인
+- [x] **매일 자동 수집 Timer 로컬 검증** — CRON 을 임시 단축(목록 40s·조회수 50s)해 수동 트리거 없이 자동 발화 확인. adListCollector(신규 23건 감지→큐→상세 23건 처리)·viewCountCollector(105 스냅샷) 정상, collection_runs 기록. 테스트 후 운영 CRON(`0 0 0,12 * * *`·`0 0 3 * * *`)으로 원복
 - [x] esbuild 번들 수정 — `pg` external→번들 포함(pnpm 심링크 해석 회피), `pg-native` 만 external
 
 ### 미검증 갭 보강 (단위테스트)
