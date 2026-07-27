@@ -105,6 +105,17 @@
 - [ ] **[한계] 대형 광고주 전체 크롤 시 Google 봇 차단** — 상세 요청 수백~수천 건 폭주 시 차단(HTML). 부분 수집됨(드래프터 103·더스크랙 151·아이리스 27). 대응: 시간 분산(일별 Timer 누적)·curl-impersonate/프록시·또는 SerpApi(유료·안정) 검토
 - [ ] (후속) 크롤 형식 변경 모니터링
 
+### 일별 조회수 추적 (YouTube API 조사 + 구현 계획)
+
+- [x] **API 조사** — YouTube Data API `videos.list?part=statistics` 는 **현재 누적 viewCount 만** 제공(일별 이력 없음). Analytics API(`dimensions=day` 시계열)는 **소유자 OAuth 전용**(API 키 401)이라 경쟁사 영상 불가 → 실측 확인
+- [x] **결론** — 경쟁사 영상의 일별 조회수를 주는 공개 API 없음. **매일 누적 스냅샷 → 전일 대비 delta 로 자체 시계열 구축**이 유일한 방법(수집 시작 이후만, 과거 백필 불가)
+- [x] **이미 구현됨** — `collectViewCounts`(일별 Timer)+`collectAdDetail`(수집 시 즉시) 로 `ad_metrics` 일별 스냅샷, 상세 페이지 일별 증가량 꺾은선 그래프
+- [ ] **보강 계획**:
+  - [ ] 영상 `publishedAt`(게시일) 저장 → 게시 후 경과일·일평균 조회수 컨텍스트 제공
+  - [ ] 스냅샷 간격 보정 — 스냅샷이 며칠 걸러 있으면 `delta ÷ 경과일수 = 일평균`으로 정규화 표시
+  - [ ] 일별 스냅샷 신뢰성 — Azure Timer 매일 1회 전체 youtube 광고 스냅샷, 실패·누락 모니터링(collection_runs)
+  - [ ] (선택) likeCount 일별 추세 그래프, 한계 UI 안내("수집 시작일부터의 일별 조회수")
+
 ### 조회·관리 화면
 
 - [x] Next.js 14 앱 스캐폴딩 (App Router, `next dev`, transpilePackages `@adref/core`)

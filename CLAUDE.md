@@ -66,6 +66,7 @@
 - DB 스키마 변경은 로컬·Azure 공용 마이그레이션 스크립트로만 반영한다 (`schema.ts` 수정 → `db:generate` → `migrate`).
 - 수집기는 멱등 설계(`creative_id` upsert, `ad_metrics` 스냅샷 이력 보존), raw jsonb 보존, 쿼터 가드를 유지한다.
 - 조회수는 두 경로로 채운다: (1) 상세 수집(`collectAdDetail`) 시 해당 영상 조회수를 즉시 스냅샷(신규 광고 즉시 표시), (2) 일별 Timer(`collectViewCounts`)로 전체 갱신(성장 추세). YouTube Data API 는 무료라 SerpApi/크롤 쿼터와 무관. 비공개·삭제 영상은 통계 미제공(조회수 없음, 정상).
+- **일별 조회수 원리:** YouTube Data API 는 **현재 누적 viewCount 만** 준다(일별 이력 없음). Analytics API 는 소유자 OAuth 전용이라 경쟁사 영상 불가. 따라서 경쟁사 영상의 "일별 조회수"는 **매일 누적을 스냅샷해 전일 대비 delta 로 자체 시계열을 구축**하는 방식뿐이며, 수집 시작 이후만 가능(과거 백필 불가). 첫 스냅샷은 그 시점 누적 총량.
 - `@adref/core` barrel(`index.ts`)에는 `import.meta` 의존 모듈(`migrate.ts`)을 export 하지 않는다 (CJS 소비 시 깨짐).
 
 ## SerpApi 실측 메모 (2026-07)
