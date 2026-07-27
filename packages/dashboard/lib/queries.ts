@@ -68,6 +68,8 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
   }
   conds.push(...periodOverlapConds(filter.from, filter.to));
 
+  // 최신순 = 영상 게시일(publishedAt) 기준. 없으면 게재 시작일 → 수집 시각 폴백.
+  const recencySql = sql`coalesce(${ads.publishedAt}, ${ads.firstShown}::timestamptz, ${ads.collectedAt})`;
   const order =
     filter.sort === 'views'
       ? desc(latestViewsSql)
@@ -75,7 +77,7 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
         ? desc(latestLikesSql)
         : filter.sort === 'duration'
           ? desc(ads.daysShown)
-          : desc(ads.collectedAt);
+          : desc(recencySql);
 
   const rows = await db()
     .select({

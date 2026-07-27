@@ -8,6 +8,13 @@
       "when": 1784851298285,
       "tag": "0000_lucky_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785120430312,
+      "tag": "0001_slippery_venom",
+      "breakpoints": true
     }
   ]
 }

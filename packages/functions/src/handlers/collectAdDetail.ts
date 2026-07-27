@@ -52,6 +52,18 @@ export async function collectAdDetail(deps: HandlerDeps, msg: NewAdQueueMessage)
     }
   }
 
+  // 조회수·좋아요·게시일을 upsert 전에 확보 (게시일을 광고 행에 저장하기 위함).
+  // YouTube API 는 무료(별도 쿼터)라 SerpApi/크롤 쿼터와 무관. 실패는 무시.
+  let stats: { viewCount?: bigint; likeCount?: number; publishedAt?: string } | undefined;
+  if (youtubeVideoId) {
+    try {
+      const res = await deps.youtube.getVideoStats([youtubeVideoId]);
+      stats = res.stats[0];
+    } catch {
+      // 통계 실패는 광고 저장을 막지 않는다 (일별 Timer 가 이후 보완)
+    }
+  }
+
   // 목록 스냅샷(format/게재일/게재일수)은 msg 에서, 영상·랜딩은 detail 에서 병합.
   const saved = await repos.ads.upsertByCreativeId({
     competitorId: msg.competitorId,
@@ -63,6 +75,7 @@ export async function collectAdDetail(deps: HandlerDeps, msg: NewAdQueueMessage)
     daysShown: msg.daysShown ?? daysBetween(msg.firstShown, msg.lastShown),
     videoUrl: detail.videoUrl,
     youtubeVideoId,
+    publishedAt: stats?.publishedAt ? new Date(stats.publishedAt) : null,
     thumbnailPath,
     landingUrl: detail.landingUrl,
     landingDomain: landingDomain(detail.landingUrl),
@@ -71,22 +84,13 @@ export async function collectAdDetail(deps: HandlerDeps, msg: NewAdQueueMessage)
     collectedAt: new Date(),
   });
 
-  // 수집 시점에 조회수도 함께 확보 (일별 Timer 를 기다리지 않고 즉시 표시).
-  // YouTube API 는 무료(별도 쿼터)라 SerpApi/크롤 쿼터와 무관. 실패는 무시.
-  if (youtubeVideoId) {
-    try {
-      const { stats } = await deps.youtube.getVideoStats([youtubeVideoId]);
-      const s = stats[0];
-      if (s) {
-        await repos.adMetrics.insertSnapshot({
-          adId: saved.id,
-          snapshotDate: new Date().toISOString().slice(0, 10),
-          ytViewCount: s.viewCount,
-          ytLikeCount: s.likeCount,
-        });
-      }
-    } catch {
-      // 조회수 실패는 광고 저장을 막지 않는다 (일별 Timer 가 이후 보완)
-    }
+  // 수집 시점에 조회수 스냅샷도 즉시 적재 (일별 Timer 를 기다리지 않고 즉시 표시).
+  if (stats) {
+    await repos.adMetrics.insertSnapshot({
+      adId: saved.id,
+      snapshotDate: new Date().toISOString().slice(0, 10),
+      ytViewCount: stats.viewCount,
+      ytLikeCount: stats.likeCount,
+    });
   }
 }

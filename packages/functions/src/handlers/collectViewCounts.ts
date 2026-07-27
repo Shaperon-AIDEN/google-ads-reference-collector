@@ -38,11 +38,14 @@ export async function collectViewCounts(
     // videoId → adId[] — 여러 광고가 같은 YouTube 영상을 공유할 수 있으므로 배열로 모은다.
     // (단일 Map 이면 영상당 광고 하나만 스냅샷돼 나머지가 누락됨)
     const byVideoId = new Map<string, string[]>();
+    // 게시일(publishedAt)이 아직 없는 광고 — 이번 조회로 백필 대상
+    const needsPublishedAt = new Set<string>();
     for (const t of targets) {
       if (!t.youtubeVideoId) continue;
       const arr = byVideoId.get(t.youtubeVideoId);
       if (arr) arr.push(t.id);
       else byVideoId.set(t.youtubeVideoId, [t.id]);
+      if (!t.publishedAt) needsPublishedAt.add(t.id);
     }
 
     const ids = [...byVideoId.keys()];
@@ -53,6 +56,7 @@ export async function collectViewCounts(
 
       for (const s of stats) {
         const adIds = byVideoId.get(s.videoId) ?? [];
+        const published = s.publishedAt ? new Date(s.publishedAt) : null;
         for (const adId of adIds) {
           // 같은 영상을 쓰는 모든 광고에 스냅샷 적재
           await repos.adMetrics.insertSnapshot({
@@ -62,6 +66,10 @@ export async function collectViewCounts(
             ytLikeCount: s.likeCount,
           });
           snapshots += 1;
+          // 게시일 백필 (아직 없는 광고만) — 게시일은 불변이라 1회면 충분
+          if (published && needsPublishedAt.has(adId)) {
+            await repos.ads.setPublishedAt(adId, published);
+          }
         }
       }
     }
