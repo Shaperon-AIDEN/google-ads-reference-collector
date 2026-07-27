@@ -60,13 +60,25 @@ function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: 
 export default async function ReferenceListPage({
   searchParams,
 }: {
-  searchParams: { sort?: string; competitor?: string; format?: string; minViews?: string; best?: string };
+  searchParams: {
+    sort?: string;
+    competitor?: string;
+    format?: string;
+    minViews?: string;
+    best?: string;
+    from?: string;
+    to?: string;
+  };
 }) {
   const sort = (searchParams.sort as AdSort) ?? 'newest';
   const minViews = Number(searchParams.minViews) || 0;
   const best = (['day', 'week', 'month'].includes(searchParams.best ?? '') ? searchParams.best : undefined) as
     | BestPeriod
     | undefined;
+  // 게재 기간 필터 — YYYY-MM-DD 형식만 허용
+  const isDate = (s?: string) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const from = isDate(searchParams.from) ? searchParams.from : undefined;
+  const to = isDate(searchParams.to) ? searchParams.to : undefined;
 
   const competitors = await listCompetitors();
 
@@ -76,6 +88,8 @@ export default async function ReferenceListPage({
     if (searchParams.format) base.format = searchParams.format;
     if (minViews) base.minViews = String(minViews);
     if (best) base.best = best;
+    if (from) base.from = from;
+    if (to) base.to = to;
     const p = new URLSearchParams({ ...base, ...patch });
     // 빈 값 제거
     for (const [k, v] of [...p.entries()]) if (!v) p.delete(k);
@@ -109,14 +123,36 @@ export default async function ReferenceListPage({
         ))}
       </div>
 
+      {/* 게재 기간 — 겹치는 광고 필터. 캘린더 선택 또는 직접 입력(YYYY-MM-DD) */}
+      <form method="get" className="toolbar">
+        {/* 다른 필터 유지 */}
+        <input type="hidden" name="sort" value={sort} />
+        {searchParams.competitor && <input type="hidden" name="competitor" value={searchParams.competitor} />}
+        {searchParams.format && <input type="hidden" name="format" value={searchParams.format} />}
+        {minViews > 0 && <input type="hidden" name="minViews" value={String(minViews)} />}
+        {best && <input type="hidden" name="best" value={best} />}
+        <span className="muted">게재 기간:</span>
+        <input type="date" name="from" defaultValue={from ?? ''} aria-label="시작일" />
+        <span className="muted">~</span>
+        <input type="date" name="to" defaultValue={to ?? ''} aria-label="종료일" />
+        <button type="submit">적용</button>
+        {(from || to) && (
+          <Link href={qs({ from: '', to: '' })}>
+            <span className="badge">초기화</span>
+          </Link>
+        )}
+      </form>
+
       {best ? (
-        <BestView period={best} minViews={minViews} />
+        <BestView period={best} minViews={minViews} from={from} to={to} />
       ) : (
         <GroupedView
           sort={sort}
           competitor={searchParams.competitor}
           format={searchParams.format}
           minViews={minViews}
+          from={from}
+          to={to}
           competitors={competitors}
           qs={qs}
         />
@@ -126,8 +162,18 @@ export default async function ReferenceListPage({
 }
 
 /** 베스트 모드 — 기간 내 조회수 증가량 순위 (평면) */
-async function BestView({ period, minViews }: { period: BestPeriod; minViews: number }) {
-  const ads = await bestAds(period, minViews);
+async function BestView({
+  period,
+  minViews,
+  from,
+  to,
+}: {
+  period: BestPeriod;
+  minViews: number;
+  from?: string;
+  to?: string;
+}) {
+  const ads = await bestAds(period, minViews, from, to);
   return (
     <>
       <h2>
@@ -155,6 +201,8 @@ async function GroupedView({
   competitor,
   format,
   minViews,
+  from,
+  to,
   competitors,
   qs,
 }: {
@@ -162,6 +210,8 @@ async function GroupedView({
   competitor?: string;
   format?: string;
   minViews: number;
+  from?: string;
+  to?: string;
   competitors: Array<{ id: string; name: string; adCount: number }>;
   qs: (patch: Record<string, string>) => string;
 }) {
@@ -170,6 +220,8 @@ async function GroupedView({
     competitorId: competitor || undefined,
     format: (format as 'video' | 'image' | 'text') || undefined,
     minViews,
+    from,
+    to,
   });
 
   const byCompetitor = new Map<string, { name: string; ads: AdCard[] }>();

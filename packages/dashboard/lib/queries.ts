@@ -11,6 +11,17 @@ export interface AdListFilter {
   format?: 'video' | 'image' | 'text';
   sort?: AdSort;
   minViews?: number; // 최신 조회수 하한
+  from?: string; // 게재 기간 시작(YYYY-MM-DD) — 이 날짜에도 게재 중이던 광고까지 포함(겹침)
+  to?: string; // 게재 기간 종료(YYYY-MM-DD)
+}
+
+/** 게재 기간이 [from, to] 와 겹치는 광고 조건. null 게재일은 열린 구간으로 취급(관대). */
+function periodOverlapConds(from?: string, to?: string) {
+  const conds = [];
+  // 시작이 to 이전(또는 미상)이어야 하고, 종료가 from 이후(또는 미상)여야 겹친다.
+  if (to) conds.push(sql`(${ads.firstShown} IS NULL OR ${ads.firstShown} <= ${to})`);
+  if (from) conds.push(sql`(${ads.lastShown} IS NULL OR ${ads.lastShown} >= ${from})`);
+  return conds;
 }
 
 export interface AdCard {
@@ -53,6 +64,7 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
   if (filter.minViews && filter.minViews > 0) {
     conds.push(sql`${latestViewsSql} >= ${filter.minViews}`);
   }
+  conds.push(...periodOverlapConds(filter.from, filter.to));
 
   const order =
     filter.sort === 'views'
@@ -105,7 +117,7 @@ export interface BestAd extends AdCard {
  * 스냅샷 이력이 부족하면 growth≈0 이 되어 총 조회수(latestViews) 순으로 자연 폴백된다.
  * 이력이 쌓일수록 진짜 "급상승" 순위가 된다.
  */
-export async function bestAds(period: BestPeriod, minViews = 0): Promise<BestAd[]> {
+export async function bestAds(period: BestPeriod, minViews = 0, from?: string, to?: string): Promise<BestAd[]> {
   const days = PERIOD_DAYS[period];
   // 상관 서브쿼리 컬럼은 리터럴 ads.id 로 (Drizzle ${} 한정자 누락 버그 회피)
   const growthSql = sql<number>`(
@@ -118,6 +130,7 @@ export async function bestAds(period: BestPeriod, minViews = 0): Promise<BestAd[
 
   const conds = [sql`${latestViewsSql} IS NOT NULL`];
   if (minViews > 0) conds.push(sql`${latestViewsSql} >= ${minViews}`);
+  conds.push(...periodOverlapConds(from, to));
 
   const rows = await db()
     .select({
