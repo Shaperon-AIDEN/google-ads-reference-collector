@@ -65,6 +65,7 @@
 - 시크릿(SerpApi·YouTube 키)은 코드/문서에 하드코딩 금지. 로컬은 `.env`/`local.settings.json`, Azure는 Key Vault.
 - DB 스키마 변경은 로컬·Azure 공용 마이그레이션 스크립트로만 반영한다 (`schema.ts` 수정 → `db:generate` → `migrate`).
 - 수집기는 멱등 설계(`creative_id` upsert, `ad_metrics` 스냅샷 이력 보존), raw jsonb 보존, 쿼터 가드를 유지한다.
+- 조회수는 두 경로로 채운다: (1) 상세 수집(`collectAdDetail`) 시 해당 영상 조회수를 즉시 스냅샷(신규 광고 즉시 표시), (2) 일별 Timer(`collectViewCounts`)로 전체 갱신(성장 추세). YouTube Data API 는 무료라 SerpApi/크롤 쿼터와 무관. 비공개·삭제 영상은 통계 미제공(조회수 없음, 정상).
 - `@adref/core` barrel(`index.ts`)에는 `import.meta` 의존 모듈(`migrate.ts`)을 export 하지 않는다 (CJS 소비 시 깨짐).
 
 ## SerpApi 실측 메모 (2026-07)
