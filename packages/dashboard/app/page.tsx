@@ -48,6 +48,7 @@ function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: 
         <div className="meta">
           <span className={`badge ${ad.format}`}>{ad.format}</span>
           <span>👁 {fmtViews(ad.latestViews)}</span>
+          {ad.latestLikes != null && <span>👍 {fmtViews(ad.latestLikes)}</span>}
           {growth != null && growth > 0 && <span style={{ color: 'var(--ok)' }}>▲ {fmtViews(growth)}</span>}
           {ad.daysShown != null && <span>📅 {ad.daysShown}일</span>}
         </div>
