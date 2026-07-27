@@ -112,7 +112,7 @@
 - [x] **이미 구현됨** — `collectViewCounts`(일별 Timer)+`collectAdDetail`(수집 시 즉시) 로 `ad_metrics` 일별 스냅샷(조회수+좋아요), 상세 페이지 일별 증가량 꺾은선 그래프
 - [x] **좋아요(likeCount) 수집·표시** — 어댑터가 `statistics.likeCount` 를 함께 조회, `ad_metrics.yt_like_count` 에 스냅샷. 상세 페이지에 **총 좋아요** 행 + **일별 좋아요 증가량** 꺾은선 그래프 추가(비공개 좋아요 영상은 값 없음 안내)
 - [ ] **보강 계획**:
-  - [ ] 영상 `publishedAt`(게시일) 저장 → 게시 후 경과일·일평균 조회수 컨텍스트 제공
+  - [x] 영상 `publishedAt`(게시일) 저장 — YouTube `part=snippet,statistics` 로 함께 수집, `ads.published_at` 컬럼(마이그레이션 0001). 기존 광고 백필 완료(278건). **최신순 정렬을 게시일 기준으로 변경**(폴백: 게재시작일→수집시각)
   - [ ] 스냅샷 간격 보정 — 스냅샷이 며칠 걸러 있으면 `delta ÷ 경과일수 = 일평균`으로 정규화 표시
   - [ ] 일별 스냅샷 신뢰성 — Azure Timer 매일 1회 전체 youtube 광고 스냅샷, 실패·누락 모니터링(collection_runs)
   - [ ] (선택) 한계 UI 안내("수집 시작일부터의 일별 조회수")
@@ -142,6 +142,7 @@
 - [x] **좋아요순 정렬** — 목록 정렬에 "좋아요순"(latestLikes desc) 추가(최신/조회수/좋아요/게재기간)
 - [x] **게재 기간 필터** — "언제부터~언제까지" 날짜 범위 입력(네이티브 date input: 캘린더 선택+직접 입력). 게재 기간이 범위와 **겹치는** 광고 필터(null 게재일은 열린 구간). 일반·베스트 공통, 다른 필터와 조합 유지
 - [x] **조회수 미확인 영상 숨김** — 최신 스냅샷 조회수가 없는 광고(비-YouTube·비공개·삭제)를 목록에서 제외(`latestViews IS NOT NULL`). 비파괴(데이터 보존 → 이후 조회수 잡히면 자동 재노출), 베스트 뷰는 기존부터 제외됨
+- [x] **최신순 = 영상 게시일 기준** — 기존 최신순은 수집 시각(collectedAt) 기준이었음. YouTube `snippet.publishedAt` 을 `ads.published_at` 에 저장(수집 시 collectAdDetail·일별 collectViewCounts 백필)하고, 최신순을 `coalesce(published_at, first_shown, collected_at)` desc 로 정렬. 마이그레이션 0001, 기존 278건 백필
 
 ## Phase 3 — 로컬 통합 테스트 🚧 게이트
 

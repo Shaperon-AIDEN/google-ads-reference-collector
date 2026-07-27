@@ -36,7 +36,8 @@ export class YouTubeDataApiClient implements YouTubeClient {
 
     for (const group of chunk(unique, BATCH)) {
       const url = new URL(YT_BASE);
-      url.searchParams.set('part', 'statistics');
+      // snippet(게시일) + statistics(조회수·좋아요)를 한 번에 조회. 둘 다 1유닛(무료).
+      url.searchParams.set('part', 'snippet,statistics');
       url.searchParams.set('id', group.join(','));
       url.searchParams.set('key', this.apiKey);
 
@@ -50,9 +51,11 @@ export class YouTubeDataApiClient implements YouTubeClient {
       const items = (json.items as Json[] | undefined) ?? [];
       for (const item of items) {
         const s = (item.statistics as Json | undefined) ?? {};
+        const snippet = (item.snippet as Json | undefined) ?? {};
         const viewCount = typeof s.viewCount === 'string' ? BigInt(s.viewCount) : undefined;
         const likeCount = typeof s.likeCount === 'string' ? Number(s.likeCount) : undefined;
-        stats.push({ videoId: String(item.id), viewCount, likeCount });
+        const publishedAt = typeof snippet.publishedAt === 'string' ? snippet.publishedAt : undefined;
+        stats.push({ videoId: String(item.id), viewCount, likeCount, publishedAt });
       }
     }
 

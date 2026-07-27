@@ -42,6 +42,8 @@ export const ads = pgTable('ads', {
   daysShown: integer('days_shown'),
   videoUrl: text('video_url'),
   youtubeVideoId: text('youtube_video_id'),
+  // 영상 게시일 (YouTube snippet.publishedAt) — 최신순 정렬 기준. 비-YouTube·미조회 시 null.
+  publishedAt: timestamp('published_at', { withTimezone: true }),
   thumbnailPath: text('thumbnail_path'),
   landingUrl: text('landing_url'),
   landingDomain: text('landing_domain'),

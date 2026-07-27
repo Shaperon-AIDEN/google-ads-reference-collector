@@ -2,6 +2,7 @@ export interface VideoStats {
   videoId: string;
   viewCount?: bigint;
   likeCount?: number;
+  publishedAt?: string; // 영상 게시일 (ISO 8601, snippet.publishedAt)
 }
 
 /**

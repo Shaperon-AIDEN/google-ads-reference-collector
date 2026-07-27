@@ -65,7 +65,8 @@
 - 시크릿(SerpApi·YouTube 키)은 코드/문서에 하드코딩 금지. 로컬은 `.env`/`local.settings.json`, Azure는 Key Vault.
 - DB 스키마 변경은 로컬·Azure 공용 마이그레이션 스크립트로만 반영한다 (`schema.ts` 수정 → `db:generate` → `migrate`).
 - 수집기는 멱등 설계(`creative_id` upsert, `ad_metrics` 스냅샷 이력 보존), raw jsonb 보존, 쿼터 가드를 유지한다.
-- 조회수·좋아요는 두 경로로 채운다: (1) 상세 수집(`collectAdDetail`) 시 해당 영상 통계를 즉시 스냅샷(신규 광고 즉시 표시), (2) 일별 Timer(`collectViewCounts`)로 전체 갱신(성장 추세). `videos.list?part=statistics` 한 번에 viewCount·likeCount 를 함께 받아 `ad_metrics`(yt_view_count·yt_like_count)에 적재. YouTube Data API 는 무료라 SerpApi/크롤 쿼터와 무관. 비공개·삭제 영상은 통계 미제공(값 없음, 정상). 좋아요 비공개 영상은 likeCount 만 없을 수 있음.
+- 조회수·좋아요는 두 경로로 채운다: (1) 상세 수집(`collectAdDetail`) 시 해당 영상 통계를 즉시 스냅샷(신규 광고 즉시 표시), (2) 일별 Timer(`collectViewCounts`)로 전체 갱신(성장 추세). `videos.list?part=snippet,statistics` 한 번에 viewCount·likeCount·publishedAt(게시일)을 함께 받아 `ad_metrics`(yt_view_count·yt_like_count)와 `ads.published_at` 에 적재(둘 다 1유닛·무료). YouTube Data API 는 무료라 SerpApi/크롤 쿼터와 무관. 비공개·삭제 영상은 통계 미제공(값 없음, 정상). 좋아요 비공개 영상은 likeCount 만 없을 수 있음.
+- **최신순 정렬**은 영상 게시일(`ads.published_at`, YouTube `snippet.publishedAt`) 기준이다(수집 시각 아님). 게시일이 없으면 `coalesce(published_at, first_shown, collected_at)` 로 폴백. 게시일은 불변이라 1회만 저장(upsert 는 새 값 있을 때만 갱신, 일별 Timer 가 기존 광고 백필). **대시보드는 조회수 미확인 영상(비-YouTube·비공개·삭제)을 목록에서 숨긴다**(`latestViews IS NOT NULL`, 비파괴).
 - **일별 조회수/좋아요 원리:** YouTube Data API v3 전체 20개 리소스 중 조회수·좋아요는 `Videos` 만 제공하고 **현재 누적값만** 준다(`videos.list`·`batchGetStats` 모두 일별 이력 없음). Analytics API 의 `dimensions=day` 시계열은 소유자 OAuth 전용이라 경쟁사 영상 불가. 따라서 경쟁사 영상의 "일별 조회수/좋아요"는 **매일 누적을 스냅샷해 전일 대비 delta 로 자체 시계열을 구축**하는 방식뿐이며, 수집 시작 이후만 가능(과거 백필 불가). 첫 스냅샷은 그 시점 누적 총량.
 - `@adref/core` barrel(`index.ts`)에는 `import.meta` 의존 모듈(`migrate.ts`)을 export 하지 않는다 (CJS 소비 시 깨짐).
 

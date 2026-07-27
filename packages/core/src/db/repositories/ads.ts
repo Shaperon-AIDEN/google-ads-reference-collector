@@ -1,4 +1,4 @@
-import { eq, inArray, isNotNull } from 'drizzle-orm';
+import { eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../client.js';
 import { ads, type Ad, type NewAd } from '../schema.js';
 
@@ -34,6 +34,8 @@ export class AdRepository {
           thumbnailPath: input.thumbnailPath,
           landingUrl: input.landingUrl,
           landingDomain: input.landingDomain,
+          // 게시일은 안정적이므로 새 값이 있을 때만 갱신(없으면 기존값 유지)
+          publishedAt: sql`coalesce(excluded.published_at, ads.published_at)`,
           regions: input.regions,
           raw: input.raw,
           collectedAt: input.collectedAt ?? new Date(),
@@ -43,12 +45,17 @@ export class AdRepository {
     return rows[0]!;
   }
 
-  /** youtube_video_id 를 가진 광고 (조회수 수집 대상) */
-  async withYouTubeId(): Promise<Pick<Ad, 'id' | 'youtubeVideoId'>[]> {
+  /** youtube_video_id 를 가진 광고 (조회수 수집 대상). 게시일 백필 판단용으로 publishedAt 포함. */
+  async withYouTubeId(): Promise<Pick<Ad, 'id' | 'youtubeVideoId' | 'publishedAt'>[]> {
     return this.db
-      .select({ id: ads.id, youtubeVideoId: ads.youtubeVideoId })
+      .select({ id: ads.id, youtubeVideoId: ads.youtubeVideoId, publishedAt: ads.publishedAt })
       .from(ads)
       .where(isNotNull(ads.youtubeVideoId));
+  }
+
+  /** 영상 게시일 백필 — 아직 없을 때만 설정(게시일은 불변). */
+  async setPublishedAt(id: string, publishedAt: Date): Promise<void> {
+    await this.db.update(ads).set({ publishedAt }).where(eq(ads.id, id));
   }
 
   async findById(id: string): Promise<Ad | undefined> {
