@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Ad Reference Collector (Transparency Center)",
+  "version": "1.0.0",
+  "description": "Google 광고 투명성 센터에서 경쟁사 광고를 실제 브라우저 세션으로 수집해 백엔드로 전송(봇 차단 회피).",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "https://adstransparency.google.com/*",
+    "https://*.googlesyndication.com/*",
+    "https://*.googleusercontent.com/*",
+    "https://*.gstatic.com/*",
+    "https://*.doubleclick.net/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "http://192.168.0.124/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://adstransparency.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_popup": "popup.html", "default_title": "Ad Reference Collector" }
+}

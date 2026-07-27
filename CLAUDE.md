@@ -79,9 +79,16 @@
 - **상세 "결과 없음":** 일부 크리에이티브는 상세 API 가 "hasn't returned any results" 를 반환한다(영구 조건). `getAdDetail` 은 이 경우 예외 대신 빈 상세(`raw.detailUnavailable`)를 반환해 목록 데이터만으로 저장 — 재시도·포이즌·쿼터 낭비를 막는다.
 - **쿼터 주의:** 광고 N건 수집 = 목록 1 + 상세 N SerpApi 호출. "지금 수집"으로 대형 광고주(40건)를 수집하면 ~41회 소모. Free 250/월 에선 몇 번이면 소진 — 운영은 Developer 5000/월. 대형 광고주 폭주 방지로 `collectForCompetitor` 에 `maxTotal` 상한 지원.
 
+## 브라우저 확장 수집 (Chrome extension → /api/ingest)
+
+- **동기:** 서버(로컬·DGX 등 데이터센터 IP)로 직접 크롤하면 Google `/sorry`(비정상 트래픽 차단)에 막힌다. **실제 사용자 브라우저의 first-party 요청은 차단을 회피**하므로, Chrome 확장이 투명성 센터에서 수집해 백엔드로 전송한다. (Playwright 헤드리스는 탐지되므로 사용 안 함)
+- 확장(`tools/chrome-extension/`): content script 가 adstransparency.google.com 페이지 컨텍스트에서 `SearchCreatives`·`GetCreativeById` 를 **same-origin** 호출(파싱은 `transparencyCrawl.ts` 와 동일), 미리보기 content.js·백엔드 POST 는 background 서비스워커가 대행(CORS 회피). 이미 저장된 것은 `/api/known` 으로 걸러 **신규만 상세 요청**.
+- 백엔드 엔드포인트(`packages/functions/src/functions/ingestHttp.ts`, CORS 허용): `POST /api/ingest`(저장), `POST /api/known`(기존 creative_id), `GET /api/advertisers`(경쟁사 목록). 저장 핸들러 `ingestCreatives` 는 collectAdDetail 의 저장 계층 재사용 — creative_id 멱등 upsert + YouTube 조회수/좋아요/게시일 스냅샷(서버 측, 무료). **비디오만** 저장.
+- 사용법·설치는 `tools/chrome-extension/README.md`. 요청 간격(delay)·차단 감지 자동 중단 내장.
+
 ## 데이터 소스 스위칭 (SerpApi ↔ 크롤)
 
-- `ADS_SOURCE` 환경변수로 광고 데이터 소스를 고른다. **롤백은 이 값만 변경**(코드 변경 없음):
+- `ADS_SOURCE` 환경변수로 **서버 측** 광고 데이터 소스를 고른다(브라우저 확장 경로와 별개). **롤백은 이 값만 변경**(코드 변경 없음):
   - `serpapi` (기본·안정·유료): `SerpApiAdsSource`. SerpApi 코드는 크롤 도입과 무관하게 유지 → 롤백 경로 안전.
   - `crawl` (무료·비공식·실험적): `TransparencyCrawlAdsSource`. 투명성 센터 내부 RPC 직접 호출(curl).
     - 목록: `SearchService/SearchCreatives`, req `{"2":n,"3":{"12":{"1":"","2":true},"13":{"1":[advertiserId]}},"7":{"1":1,"2":0,"3":region}}`, 페이지네이션=req field `4`(=응답 field `2` 토큰). 응답 item: `2`=creativeId, `4`=format(1/2/3), `6`/`7`=Unix 게재일.
