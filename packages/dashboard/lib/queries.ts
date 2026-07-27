@@ -15,6 +15,7 @@ export interface AdListFilter {
 export interface AdCard {
   id: string;
   creativeId: string;
+  competitorId: string;
   competitorName: string;
   format: string;
   firstShown: string | null;
@@ -52,6 +53,7 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
     .select({
       id: ads.id,
       creativeId: ads.creativeId,
+      competitorId: ads.competitorId,
       competitorName: competitors.name,
       format: ads.format,
       firstShown: ads.firstShown,
@@ -66,7 +68,7 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
     .innerJoin(competitors, eq(competitors.id, ads.competitorId))
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(order)
-    .limit(200);
+    .limit(500);
 
   return rows.map((r) => ({ ...r, latestViews: r.latestViews == null ? null : Number(r.latestViews) }));
 }
@@ -84,6 +86,7 @@ export async function getAd(id: string): Promise<AdDetailView | null> {
     .select({
       id: ads.id,
       creativeId: ads.creativeId,
+      competitorId: ads.competitorId,
       competitorName: competitors.name,
       format: ads.format,
       firstShown: ads.firstShown,
