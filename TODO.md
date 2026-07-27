@@ -122,6 +122,7 @@
 - [x] **"지금 수집" 비동기화** — collect-requests 큐 + collectRequestProcessor 로 백그라운드 실행(페이지 이동해도 완료), 즉시 202 반환, 기본 상한 maxTotal=100
 - [x] **표 갱신 버그 수정** — Drizzle 상관 서브쿼리 ${col}→"id" 한정자 누락으로 광고 수·조회수가 0/null 이던 버그를 리터럴 SQL 로 수정, GET route force-dynamic + 5초 폴링
 - [x] **수집 시점 조회수 확보** — collectAdDetail 이 상세 저장 후 조회수도 즉시 스냅샷(일별 Timer 대기 제거)
+- [x] **공유 영상 조회수 누락 버그 수정** — 여러 광고가 같은 youtube_video_id 를 재사용할 때 조회수 수집기가 `영상ID→광고ID` 단일 Map 이라 영상당 한 광고만 스냅샷되던 버그. `영상ID→광고ID[]` 배열로 바꿔 공유 영상의 모든 광고에 적재(누락 5→0). (원인은 비공개/삭제가 아니라 이 중복 제거 버그였음). youtube_video_id 없는 광고(비-YouTube)는 원천적으로 조회수 미수집
 
 ## Phase 3 — 로컬 통합 테스트 🚧 게이트
 

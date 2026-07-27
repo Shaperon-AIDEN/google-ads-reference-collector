@@ -35,9 +35,14 @@ export async function collectViewCounts(
     }
 
     const targets = await repos.ads.withYouTubeId();
-    const byVideoId = new Map<string, string>(); // videoId → adId
+    // videoId → adId[] — 여러 광고가 같은 YouTube 영상을 공유할 수 있으므로 배열로 모은다.
+    // (단일 Map 이면 영상당 광고 하나만 스냅샷돼 나머지가 누락됨)
+    const byVideoId = new Map<string, string[]>();
     for (const t of targets) {
-      if (t.youtubeVideoId) byVideoId.set(t.youtubeVideoId, t.id);
+      if (!t.youtubeVideoId) continue;
+      const arr = byVideoId.get(t.youtubeVideoId);
+      if (arr) arr.push(t.id);
+      else byVideoId.set(t.youtubeVideoId, [t.id]);
     }
 
     const ids = [...byVideoId.keys()];
@@ -47,15 +52,17 @@ export async function collectViewCounts(
       quota.record(calls);
 
       for (const s of stats) {
-        const adId = byVideoId.get(s.videoId);
-        if (!adId) continue;
-        await repos.adMetrics.insertSnapshot({
-          adId,
-          snapshotDate,
-          ytViewCount: s.viewCount,
-          ytLikeCount: s.likeCount,
-        });
-        snapshots += 1;
+        const adIds = byVideoId.get(s.videoId) ?? [];
+        for (const adId of adIds) {
+          // 같은 영상을 쓰는 모든 광고에 스냅샷 적재
+          await repos.adMetrics.insertSnapshot({
+            adId,
+            snapshotDate,
+            ytViewCount: s.viewCount,
+            ytLikeCount: s.likeCount,
+          });
+          snapshots += 1;
+        }
       }
     }
 

@@ -31,6 +31,26 @@ describe('collectViewCounts', () => {
     expect(youtube.calls).toBe(1); // 배치 1회
   });
 
+  it('같은 영상을 공유하는 여러 광고 모두에 스냅샷 적재', async () => {
+    // ad1, ad2 가 동일 youtube_video_id(VID1) 공유
+    const repos = viewCountRepos([
+      { id: 'ad1', youtubeVideoId: 'VID1' },
+      { id: 'ad2', youtubeVideoId: 'VID1' },
+      { id: 'ad3', youtubeVideoId: 'VID2' },
+    ]);
+    const youtube = new FakeYouTube([
+      { videoId: 'VID1', viewCount: 100n },
+      { videoId: 'VID2', viewCount: 200n },
+    ]);
+    const deps = makeDeps({ youtube, repos: repos as never });
+
+    const res = await collectViewCounts(deps, NOW);
+
+    expect(res.snapshots).toBe(3); // ad1, ad2, ad3 모두
+    expect(repos.snapshots.map((s) => s.adId).sort()).toEqual(['ad1', 'ad2', 'ad3']);
+    expect(youtube.lastIds).toEqual(['VID1', 'VID2']); // 영상 ID 는 중복 제거되어 조회
+  });
+
   it('대상 광고가 없으면 호출 없이 success/0', async () => {
     const repos = viewCountRepos([]);
     const youtube = new FakeYouTube([]);
