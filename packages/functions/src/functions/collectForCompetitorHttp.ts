@@ -24,11 +24,11 @@ export async function collectForCompetitorHttp(
 
   const env = loadEnv();
   const queue = createQueueClient(env);
+  // 기본 상한: 크롤(무료)은 전체 수집(무제한 → 스크롤 끝까지), SerpApi(유료)는 쿼터 보호로 100.
+  const defaultMax = env.ADS_SOURCE === 'crawl' ? undefined : 100;
   const msg: CollectRequestMessage = {
     competitorId: body.competitorId,
-    // 한 번의 "지금 수집"은 기본 100건까지 (무제한 방지 — 반복 클릭으로 더 수집).
-    // SerpApi 롤백 시 쿼터 폭주도 예방.
-    maxTotal: typeof body.maxTotal === 'number' ? body.maxTotal : 100,
+    maxTotal: typeof body.maxTotal === 'number' ? body.maxTotal : defaultMax,
   };
   await queue.enqueue(env.COLLECT_QUEUE_NAME, msg);
   context.log(`[collectForCompetitor] queued competitorId=${msg.competitorId}`);

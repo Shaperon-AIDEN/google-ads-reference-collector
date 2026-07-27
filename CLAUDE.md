@@ -88,7 +88,8 @@
     - 조회수: 크롤과 무관 — YouTube Data API(무료)로 수집(youtube_video_id 있으면). 투명성 센터는 상업광고 조회수 미제공.
     - **제한**: 랜딩 URL 불안정(best-effort), 도메인 검색 미지원(회사명 검색 사용). `apiCalls=0`(쿼터 미소모).
     - **리스크**: 비공식·형식 변동 시 조용히 빈 결과, 대량 시 봇 차단 가능, ToS. 깨지면 `ADS_SOURCE=serpapi` 로 롤백.
-- 전체 수집: `collectForCompetitor` 가 `nextPageToken` 으로 페이지네이션(최대 200페이지, `maxTotal` 상한). 크롤은 무료라 전체 수집 실용적.
+- 전체 수집: `collectForCompetitor` 가 `nextPageToken` 으로 페이지네이션(최대 300페이지). "지금 수집" 기본 상한은 크롤=무제한(스크롤 끝까지)·serpapi=100. (투명성 센터는 스크롤 시 추가 로딩 방식 → nextPageToken 으로 끝까지 순회)
+- **대량 크롤 차단 주의:** 광고 수백~수천 건을 크롤하면 상세 요청 폭주로 Google 봇 차단(HTML 응답, "파싱 실패") 발생. 완화책: 큐 `batchSize=4`, 크롤 전송 `CRAWL_THROTTLE_MS`(기본 500ms) 지연. 그래도 단일 IP 로 대형 광고주(수천 건) 전체 크롤은 한계 — 시간 분산(일별 Timer 누적) 또는 SerpApi(유료·안정) 권장. 차단 시 잠시 대기 후 재개.
 
 ## 광고주 이름 검색 (Google 투명성 자동완성)
 

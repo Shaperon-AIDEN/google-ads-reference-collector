@@ -100,7 +100,10 @@
 - [x] **크롤 추출 개선** — YouTube ID **10→12/12**(`ytimg/vi` URL 형식 + `video_id` 필드 형식 모두 지원), 랜딩 URL best-effort(`destination_url`/`visible_url` 도메인 https 보정), 조회수는 YouTube API로 수집(최대 870만 확인)
 - [x] **크롤 랜딩 한계 확인** — 랜딩은 content.js 에만 있고 렌더가 비결정적이라 일부만 확보(best-effort). `GetCreativeById` 응답엔 랜딩 필드 없음. 안정적 랜딩 필요 시 SerpApi
 - [ ] (후속) **일괄 등록**: 도메인/회사명 여러 개를 한 번에 입력해 순차 탐색·등록
-- [ ] (후속) 크롤 대량 수집 시 봇 차단 대응(curl-cffi/백오프)·형식 변경 모니터링
+- [x] **전체 수집(스크롤 끝까지)** — `collectForCompetitor` 페이지네이션(nextPageToken, 최대 300p)으로 경쟁사의 모든 광고 순회. "지금 수집" 기본 상한을 크롤=무제한/serpapi=100 으로. 목록 페이지네이션 실증(드래프터 총 527건·비디오 439건, 14페이지 끝까지)
+- [x] 대량 크롤 완화책 — 큐 `batchSize` 16→4, 크롤 전송 `CRAWL_THROTTLE_MS`(기본 500ms) 지연
+- [ ] **[한계] 대형 광고주 전체 크롤 시 Google 봇 차단** — 상세 요청 수백~수천 건 폭주 시 차단(HTML). 부분 수집됨(드래프터 103·더스크랙 151·아이리스 27). 대응: 시간 분산(일별 Timer 누적)·curl-impersonate/프록시·또는 SerpApi(유료·안정) 검토
+- [ ] (후속) 크롤 형식 변경 모니터링
 
 ### 조회·관리 화면
 
