@@ -1,7 +1,7 @@
 import { QuotaGuard, type AdDetail, type NewAdQueueMessage } from '@adref/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { collectAdDetail } from '../src/handlers/collectAdDetail.js';
-import { FakeBlob, FakeDetailSource, detailRepos, makeDeps } from './fakes.js';
+import { FakeBlob, FakeDetailSource, FakeYouTube, detailRepos, makeDeps } from './fakes.js';
 
 const msg: NewAdQueueMessage = {
   competitorId: 'c1',
@@ -48,6 +48,19 @@ describe('collectAdDetail', () => {
     // 썸네일이 실제로 Blob 에 저장됨
     expect(blob.puts).toHaveLength(1);
     expect(blob.puts[0]).toMatchObject({ container: 'thumbnails', path: 'CR1.jpg', contentType: 'image/jpeg' });
+  });
+
+  it('영상 광고: 수집 시점에 조회수 스냅샷도 함께 저장', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from('J'), { status: 200 })));
+    const repos = detailRepos();
+    const youtube = new FakeYouTube([{ videoId: 'TOnJMLfOZCs', viewCount: 73272n, likeCount: 12 }]);
+    const deps = makeDeps({ ads: new FakeDetailSource(videoDetail), blob: new FakeBlob(), repos: repos as never, youtube });
+
+    await collectAdDetail(deps, msg);
+
+    expect(repos.snapshots).toHaveLength(1);
+    expect(repos.snapshots[0]).toMatchObject({ adId: 'ad-1', ytViewCount: 73272n, ytLikeCount: 12 });
+    expect(repos.snapshots[0]!.snapshotDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('썸네일 fetch 실패해도 광고는 저장된다 (베스트 에포트)', async () => {

@@ -110,15 +110,22 @@ export function fakeRepos(opts: {
   };
 }
 
-/** 상세 수집기용 리포지토리 페이크 — upsert 된 광고를 캡처 */
+/** 상세 수집기용 리포지토리 페이크 — upsert 된 광고 + 조회수 스냅샷을 캡처 */
 export function detailRepos() {
   const upserts: NewAd[] = [];
+  const snapshots: Array<{ adId: string; snapshotDate: string; ytViewCount?: bigint; ytLikeCount?: number }> = [];
   return {
     upserts,
+    snapshots,
     ads: {
       upsertByCreativeId: async (input: NewAd) => {
         upserts.push(input);
         return { id: `ad-${upserts.length}`, ...input };
+      },
+    },
+    adMetrics: {
+      insertSnapshot: async (s: { adId: string; snapshotDate: string; ytViewCount?: bigint; ytLikeCount?: number }) => {
+        snapshots.push(s);
       },
     },
   };
@@ -153,6 +160,7 @@ export function makeDeps(partial: Partial<HandlerDeps> & { quota?: QuotaGuard })
   return {
     env: { AD_QUEUE_NAME: 'new-ads', BLOB_CONTAINER: 'thumbnails' },
     quota: partial.quota ?? new QuotaGuard({ monthlyBudget: 5000, throttlePct: 0.8 }),
+    youtube: partial.youtube ?? new FakeYouTube([]), // 기본 빈 통계 (조회수 미확보)
     ...partial,
   } as unknown as HandlerDeps;
 }
