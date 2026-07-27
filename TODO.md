@@ -107,20 +107,21 @@
 
 ### 일별 조회수 추적 (YouTube API 조사 + 구현 계획)
 
-- [x] **API 조사** — YouTube Data API `videos.list?part=statistics` 는 **현재 누적 viewCount 만** 제공(일별 이력 없음). Analytics API(`dimensions=day` 시계열)는 **소유자 OAuth 전용**(API 키 401)이라 경쟁사 영상 불가 → 실측 확인
-- [x] **결론** — 경쟁사 영상의 일별 조회수를 주는 공개 API 없음. **매일 누적 스냅샷 → 전일 대비 delta 로 자체 시계열 구축**이 유일한 방법(수집 시작 이후만, 과거 백필 불가)
-- [x] **이미 구현됨** — `collectViewCounts`(일별 Timer)+`collectAdDetail`(수집 시 즉시) 로 `ad_metrics` 일별 스냅샷, 상세 페이지 일별 증가량 꺾은선 그래프
+- [x] **API 조사** — YouTube Data API v3 **전체 20개 리소스** 확인. 조회수·좋아요를 주는 건 `Videos` 하나뿐(`videos.list?part=statistics`·신규 `batchGetStats` 둘 다 **현재 누적만**, 일별 이력 없음). Analytics API(`dimensions=day` 시계열)는 **소유자 OAuth 전용**(API 키 401)이라 경쟁사 영상 불가 → 실측 확인
+- [x] **결론** — 경쟁사 영상의 일별 조회수/좋아요를 주는 공개 API 없음. **매일 누적 스냅샷 → 전일 대비 delta 로 자체 시계열 구축**이 유일한 방법(수집 시작 이후만, 과거 백필 불가)
+- [x] **이미 구현됨** — `collectViewCounts`(일별 Timer)+`collectAdDetail`(수집 시 즉시) 로 `ad_metrics` 일별 스냅샷(조회수+좋아요), 상세 페이지 일별 증가량 꺾은선 그래프
+- [x] **좋아요(likeCount) 수집·표시** — 어댑터가 `statistics.likeCount` 를 함께 조회, `ad_metrics.yt_like_count` 에 스냅샷. 상세 페이지에 **총 좋아요** 행 + **일별 좋아요 증가량** 꺾은선 그래프 추가(비공개 좋아요 영상은 값 없음 안내)
 - [ ] **보강 계획**:
   - [ ] 영상 `publishedAt`(게시일) 저장 → 게시 후 경과일·일평균 조회수 컨텍스트 제공
   - [ ] 스냅샷 간격 보정 — 스냅샷이 며칠 걸러 있으면 `delta ÷ 경과일수 = 일평균`으로 정규화 표시
   - [ ] 일별 스냅샷 신뢰성 — Azure Timer 매일 1회 전체 youtube 광고 스냅샷, 실패·누락 모니터링(collection_runs)
-  - [ ] (선택) likeCount 일별 추세 그래프, 한계 UI 안내("수집 시작일부터의 일별 조회수")
+  - [ ] (선택) 한계 UI 안내("수집 시작일부터의 일별 조회수")
 
 ### 조회·관리 화면
 
 - [x] Next.js 14 앱 스캐폴딩 (App Router, `next dev`, transpilePackages `@adref/core`)
 - [x] 레퍼런스 리스트(메인): 카드 그리드, 정렬(최신/조회수/게재기간), 경쟁사·형식 필터, YouTube 썸네일
-- [x] 광고 상세: YouTube 임베드 재생, 게재 기간·랜딩 URL·총 조회수, 일별 조회수 증가량 꺾은선 그래프(→ 아래 "추가 개선" 참조)
+- [x] 광고 상세: YouTube 임베드 재생, 게재 기간·랜딩 URL·총 조회수·총 좋아요, 일별 조회수/좋아요 증가량 꺾은선 그래프(→ 아래 "추가 개선" 참조)
 - [x] 수집 현황: 최근 실행 이력, 이번 달 API 사용량(예산 대비 %) 게이지
 - [x] 로컬 개발용 목 인증(`AUTH_MODE=mock`) — Azure 는 Easy Auth 헤더(`x-ms-client-principal-name`) 읽도록 설계
 - [x] DB 직접 조회 계층(`lib/queries.ts`) — 수집기=쓰기, 대시보드=읽기
