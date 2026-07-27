@@ -26,6 +26,7 @@ export interface AdCard {
   thumbnailPath: string | null;
   landingUrl: string | null;
   latestViews: number | null;
+  latestLikes: number | null;
 }
 
 // 각 광고의 최신 조회수 스냅샷 서브쿼리.
@@ -34,6 +35,13 @@ export interface AdCard {
 const latestViewsSql = sql<number>`(
   SELECT m.yt_view_count FROM ad_metrics m
   WHERE m.ad_id = ads.id
+  ORDER BY m.snapshot_date DESC LIMIT 1
+)`;
+
+// 최신 좋아요 스냅샷 (좋아요 값이 있는 마지막 스냅샷 — 비공개 영상은 NULL 일 수 있음)
+const latestLikesSql = sql<number>`(
+  SELECT m.yt_like_count FROM ad_metrics m
+  WHERE m.ad_id = ads.id AND m.yt_like_count IS NOT NULL
   ORDER BY m.snapshot_date DESC LIMIT 1
 )`;
 
@@ -67,6 +75,7 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
       thumbnailPath: ads.thumbnailPath,
       landingUrl: ads.landingUrl,
       latestViews: latestViewsSql,
+      latestLikes: latestLikesSql,
     })
     .from(ads)
     .innerJoin(competitors, eq(competitors.id, ads.competitorId))
@@ -74,7 +83,11 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
     .orderBy(order)
     .limit(500);
 
-  return rows.map((r) => ({ ...r, latestViews: r.latestViews == null ? null : Number(r.latestViews) }));
+  return rows.map((r) => ({
+    ...r,
+    latestViews: r.latestViews == null ? null : Number(r.latestViews),
+    latestLikes: r.latestLikes == null ? null : Number(r.latestLikes),
+  }));
 }
 
 export type BestPeriod = 'day' | 'week' | 'month';
@@ -118,6 +131,7 @@ export async function bestAds(period: BestPeriod, minViews = 0): Promise<BestAd[
       thumbnailPath: ads.thumbnailPath,
       landingUrl: ads.landingUrl,
       latestViews: latestViewsSql,
+      latestLikes: latestLikesSql,
       growth: growthSql,
     })
     .from(ads)
@@ -129,6 +143,7 @@ export async function bestAds(period: BestPeriod, minViews = 0): Promise<BestAd[
   return rows.map((r) => ({
     ...r,
     latestViews: r.latestViews == null ? null : Number(r.latestViews),
+    latestLikes: r.latestLikes == null ? null : Number(r.latestLikes),
     growth: r.growth == null ? null : Number(r.growth),
   }));
 }
@@ -159,6 +174,7 @@ export async function getAd(id: string): Promise<AdDetailView | null> {
       videoUrl: ads.videoUrl,
       advertiserId: competitors.advertiserId,
       latestViews: latestViewsSql,
+      latestLikes: latestLikesSql,
     })
     .from(ads)
     .innerJoin(competitors, eq(competitors.id, ads.competitorId))
@@ -181,6 +197,7 @@ export async function getAd(id: string): Promise<AdDetailView | null> {
   return {
     ...ad,
     latestViews: ad.latestViews == null ? null : Number(ad.latestViews),
+    latestLikes: ad.latestLikes == null ? null : Number(ad.latestLikes),
     metrics: metrics.map((m) => ({
       date: m.date,
       views: m.views == null ? null : Number(m.views),
