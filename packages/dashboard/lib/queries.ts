@@ -10,6 +10,7 @@ export interface AdListFilter {
   competitorId?: string;
   format?: 'video' | 'image' | 'text';
   sort?: AdSort;
+  minViews?: number; // 최신 조회수 하한
 }
 
 export interface AdCard {
@@ -41,6 +42,9 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
   const conds = [];
   if (filter.competitorId) conds.push(eq(ads.competitorId, filter.competitorId));
   if (filter.format) conds.push(eq(ads.format, filter.format));
+  if (filter.minViews && filter.minViews > 0) {
+    conds.push(sql`${latestViewsSql} >= ${filter.minViews}`);
+  }
 
   const order =
     filter.sort === 'views'
@@ -71,6 +75,62 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
     .limit(500);
 
   return rows.map((r) => ({ ...r, latestViews: r.latestViews == null ? null : Number(r.latestViews) }));
+}
+
+export type BestPeriod = 'day' | 'week' | 'month';
+const PERIOD_DAYS: Record<BestPeriod, number> = { day: 1, week: 7, month: 30 };
+
+export interface BestAd extends AdCard {
+  growth: number | null; // 기간 내 조회수 증가량
+}
+
+/**
+ * 일간/주간/월간 베스트 — 기간 내 조회수 증가량(growth) 순위.
+ * growth = 최신 스냅샷 조회수 − (기간 시작 이전 마지막 스냅샷, 없으면 최초 스냅샷) 조회수.
+ * 스냅샷 이력이 부족하면 growth≈0 이 되어 총 조회수(latestViews) 순으로 자연 폴백된다.
+ * 이력이 쌓일수록 진짜 "급상승" 순위가 된다.
+ */
+export async function bestAds(period: BestPeriod, minViews = 0): Promise<BestAd[]> {
+  const days = PERIOD_DAYS[period];
+  // 상관 서브쿼리 컬럼은 리터럴 ads.id 로 (Drizzle ${} 한정자 누락 버그 회피)
+  const growthSql = sql<number>`(
+    (SELECT m.yt_view_count FROM ad_metrics m WHERE m.ad_id = ads.id ORDER BY m.snapshot_date DESC LIMIT 1)
+    - COALESCE(
+        (SELECT m.yt_view_count FROM ad_metrics m WHERE m.ad_id = ads.id AND m.snapshot_date <= (CURRENT_DATE - ${days}::int) ORDER BY m.snapshot_date DESC LIMIT 1),
+        (SELECT m.yt_view_count FROM ad_metrics m WHERE m.ad_id = ads.id ORDER BY m.snapshot_date ASC LIMIT 1)
+      )
+  )`;
+
+  const conds = [sql`${latestViewsSql} IS NOT NULL`];
+  if (minViews > 0) conds.push(sql`${latestViewsSql} >= ${minViews}`);
+
+  const rows = await db()
+    .select({
+      id: ads.id,
+      creativeId: ads.creativeId,
+      competitorId: ads.competitorId,
+      competitorName: competitors.name,
+      format: ads.format,
+      firstShown: ads.firstShown,
+      lastShown: ads.lastShown,
+      daysShown: ads.daysShown,
+      youtubeVideoId: ads.youtubeVideoId,
+      thumbnailPath: ads.thumbnailPath,
+      landingUrl: ads.landingUrl,
+      latestViews: latestViewsSql,
+      growth: growthSql,
+    })
+    .from(ads)
+    .innerJoin(competitors, eq(competitors.id, ads.competitorId))
+    .where(and(...conds))
+    .orderBy(desc(growthSql), desc(latestViewsSql))
+    .limit(100);
+
+  return rows.map((r) => ({
+    ...r,
+    latestViews: r.latestViews == null ? null : Number(r.latestViews),
+    growth: r.growth == null ? null : Number(r.growth),
+  }));
 }
 
 export interface AdDetailView extends AdCard {
