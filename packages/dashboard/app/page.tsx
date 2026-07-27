@@ -187,10 +187,10 @@ async function GroupedView({
     <>
       <div className="toolbar">
         <span className="muted">정렬:</span>
-        {(['newest', 'views', 'duration'] as AdSort[]).map((s) => (
+        {(['newest', 'views', 'likes', 'duration'] as AdSort[]).map((s) => (
           <Link key={s} href={qs({ sort: s })}>
             <span className={`badge ${sort === s ? 'ok' : ''}`}>
-              {s === 'newest' ? '최신순' : s === 'views' ? '조회수순' : '게재기간순'}
+              {s === 'newest' ? '최신순' : s === 'views' ? '조회수순' : s === 'likes' ? '좋아요순' : '게재기간순'}
             </span>
           </Link>
         ))}

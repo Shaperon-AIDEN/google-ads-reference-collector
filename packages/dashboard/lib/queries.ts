@@ -4,7 +4,7 @@ import { db } from './db';
 
 const { ads, adMetrics, competitors, collectionRuns } = schema;
 
-export type AdSort = 'newest' | 'views' | 'duration';
+export type AdSort = 'newest' | 'views' | 'likes' | 'duration';
 
 export interface AdListFilter {
   competitorId?: string;
@@ -57,9 +57,11 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
   const order =
     filter.sort === 'views'
       ? desc(latestViewsSql)
-      : filter.sort === 'duration'
-        ? desc(ads.daysShown)
-        : desc(ads.collectedAt);
+      : filter.sort === 'likes'
+        ? desc(latestLikesSql)
+        : filter.sort === 'duration'
+          ? desc(ads.daysShown)
+          : desc(ads.collectedAt);
 
   const rows = await db()
     .select({
