@@ -59,6 +59,7 @@ th { color: var(--muted); font-weight: 600; }
 input, select {
   background: var(--panel2); border: 1px solid var(--border); color: var(--text);
   padding: 8px 10px; border-radius: 8px; font-size: 14px;
+  color-scheme: dark; /* 네이티브 date picker 아이콘을 다크 배경에 맞게 렌더 */
 }
 button {
   background: var(--accent); color: #fff; border: none; padding: 8px 14px;
