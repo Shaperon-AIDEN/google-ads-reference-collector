@@ -4,3 +4,4 @@ import './functions/adDetailCollector.js';
 import './functions/viewCountCollector.js';
 import './functions/collectForCompetitorHttp.js';
 import './functions/collectRequestProcessor.js';
+import './functions/ingestHttp.js';
