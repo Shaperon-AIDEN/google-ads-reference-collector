@@ -88,8 +88,16 @@ export interface CrawlTransport {
   get(url: string): Promise<string>;
 }
 
+// 대량 크롤 시 Google 봇 차단을 늦추기 위한 요청 간 지연(throttle). 단건 수집엔 영향 미미.
+const THROTTLE_MS = Number(process.env.CRAWL_THROTTLE_MS ?? 500);
+function jitterDelay(): Promise<void> {
+  const ms = THROTTLE_MS + Math.floor(Math.random() * THROTTLE_MS);
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 const curlTransport: CrawlTransport = {
   async rpc(rpcPath, reqBody) {
+    await jitterDelay();
     const { stdout } = await execFileAsync(
       'curl',
       [
@@ -105,6 +113,7 @@ const curlTransport: CrawlTransport = {
     return stdout;
   },
   async get(url) {
+    await jitterDelay();
     const { stdout } = await execFileAsync('curl', ['-s', '--max-time', '25', url, '-H', `user-agent: ${UA}`], {
       maxBuffer: 32 * 1024 * 1024,
     });
