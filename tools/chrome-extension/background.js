@@ -9,6 +9,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       .catch((e) => sendResponse({ ok: false, error: String(e) }));
     return true; // async
   }
+  if (msg?.type === 'imageSize') {
+    // 이미지 URL 의 실제 픽셀 크기 측정 (로고=정사각/작음 vs 광고=배너 구분용). 서비스워커에서 createImageBitmap.
+    fetch(msg.url, { credentials: 'omit' })
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('http ' + r.status))))
+      .then((b) => createImageBitmap(b))
+      .then((bmp) => sendResponse({ ok: true, w: bmp.width, h: bmp.height }))
+      .catch((e) => sendResponse({ ok: false, error: String(e) }));
+    return true; // async
+  }
   if (msg?.type === 'post') {
     fetch(msg.url, {
       method: 'POST',

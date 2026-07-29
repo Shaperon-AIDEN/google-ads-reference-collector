@@ -100,7 +100,7 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/archive/simgad/123');
   });
 
-  it('getAdDetail: <img> 여러 개면 로고(/simgad/, archive없음) 건너뛰고 /archive/simgad/ 선택', async () => {
+  it('getAdDetail: <img> 여러 개면 정사각 로고 건너뛰고 배너 크리에이티브 선택', async () => {
     const rpc = vi.fn(async () =>
       JSON.stringify({
         '1': {

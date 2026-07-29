@@ -14,12 +14,13 @@ export function isFormatAllowed(format: AdFormat, scope: 'video' | 'all'): boole
 }
 
 /**
- * 이미지 광고 크리에이티브 URL 판별. 실제 광고는 /archive/simgad/ 경로이고,
- * archive 없는 /simgad/ 는 광고주 **로고**(크기 무관 — 2084² 대형 로고도 존재), /pagead/ 는 HTML 자산.
- * 크롤 어댑터(추출)와 ingest 핸들러(확장 전송 URL 재검증) 양쪽이 공통 사용해 로고 오수집을 막는다.
+ * 이미지 광고 크리에이티브 URL 판별(서버 안전망·URL 기반). 이미지 호스트(simgad/googleusercontent)만
+ * 허용하고 HTML 자산(/pagead/·sadbundle·discover_ads)은 제외한다.
+ * ⚠️ 로고 제외는 여기서 못 한다 — content.js 유래 광고 이미지는 로고와 **같은 `/simgad/` 경로**라
+ * URL 로는 구분 불가하고 **크기로만** 판별된다(확장이 픽셀 측정으로 처리). 여기선 명백한 비이미지만 거른다.
  */
 export function isRealCreativeUrl(u: string): boolean {
-  return /\/archive\/simgad\/|googleusercontent\.com\//.test(u) && !/\/pagead\//.test(u);
+  return /\/simgad\/|googleusercontent\.com\//.test(u) && !/\/pagead\/|\/sadbundle\/|discover_ads/.test(u);
 }
 
 /**

@@ -65,9 +65,10 @@ function extractImageUrl(html: string): string | undefined {
  * 직접 들어있다(미리보기 fetch 불필요). 첫 유효 img src 를 반환. (비디오·텍스트는 대신 `['1']['4']` 미리보기 URL)
  */
 function imageFromVariations(variations: Json[]): string | undefined {
-  // <img> 가 여러 개면(AdChoices ⓘ 아이콘·로고 + 실제 크리에이티브) width/height 로 가장 큰 것을 고른다.
-  // 작은 이미지(<=64px)는 아이콘으로 제외. 치수 미상은 후보로 유지.
-  let best: { url: string; area: number } | undefined;
+  // <img> 가 여러 개면(AdChoices ⓘ 아이콘·로고 + 실제 크리에이티브) width/height 로 판별.
+  // 작은 이미지(<=64px)=아이콘, 정사각(로고)은 제외하고 배너 비율 중 가장 큰 것을 고른다.
+  // (여기 ['3']['2'] 응답 직접 이미지는 width/height 속성이 항상 있음)
+  const cands: { url: string; area: number; square: boolean }[] = [];
   for (const v of variations) {
     const inner = v?.['3'] as Json | undefined;
     const html = typeof inner?.['2'] === 'string' ? (inner['2'] as string) : '';
@@ -79,11 +80,15 @@ function imageFromVariations(variations: Json[]): string | undefined {
       const w = Number((tag[0].match(/width=["']?(\d+)/i) ?? [])[1]) || 0;
       const h = Number((tag[0].match(/height=["']?(\d+)/i) ?? [])[1]) || 0;
       if (w > 0 && h > 0 && (w <= 64 || h <= 64)) continue; // ⓘ 아이콘·작은 로고 제외
-      const area = w * h || 1;
-      if (!best || area > best.area) best = { url: src, area };
+      const r = w > 0 && h > 0 ? w / h : 0;
+      cands.push({ url: src, area: w * h || 1, square: r >= 0.9 && r <= 1.15 }); // ~정사각만 로고로 간주
     }
   }
-  return best?.url;
+  // 정사각(로고)은 제외한다. 배너 비율만 남기고 가장 큰 것을 고른다.
+  // (정사각뿐이면 로고만 있는 광고 → imageUrl 없음)
+  const nonSquare = cands.filter((c) => !c.square);
+  nonSquare.sort((a, b) => b.area - a.area);
+  return nonSquare[0]?.url;
 }
 
 /** \xNN 16진 이스케이프 복원 */
