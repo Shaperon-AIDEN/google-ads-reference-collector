@@ -25,16 +25,22 @@ const VIEW_PRESETS: Array<{ label: string; v: number }> = [
 const BEST_LABEL: Record<BestPeriod, string> = { day: '일간 베스트', week: '주간 베스트', month: '월간 베스트' };
 
 function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: number | null }) {
-  const t = thumbUrl(ad.youtubeVideoId);
+  // 썸네일: 비디오=YouTube 썸네일, 이미지=크리에이티브 이미지, 텍스트=문구 미리보기
+  const thumb = thumbUrl(ad.youtubeVideoId) ?? ad.imageUrl;
+  const isVideo = ad.format === 'video';
   return (
     <Link href={`/ads/${ad.id}`} className="card">
       <div style={{ position: 'relative' }}>
-        {t ? (
+        {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="thumb" src={t} alt={ad.creativeId} />
+          <img className="thumb" src={thumb} alt={ad.creativeId} style={{ objectFit: 'cover' }} />
         ) : (
-          <div className="thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="muted">{ad.format}</span>
+          <div className="thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12, textAlign: 'center' }}>
+            {ad.headline ? (
+              <span style={{ fontSize: 13, color: 'var(--text)' }}>{ad.headline}</span>
+            ) : (
+              <span className="muted">{ad.format}</span>
+            )}
           </div>
         )}
         {rank != null && (
@@ -47,9 +53,16 @@ function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: 
         {rank != null && <div className="title">{ad.competitorName}</div>}
         <div className="meta">
           <span className={`badge ${ad.format}`}>{ad.format}</span>
-          <span>👁 {fmtViews(ad.latestViews)}</span>
-          {ad.latestLikes != null && <span>👍 {fmtViews(ad.latestLikes)}</span>}
-          {growth != null && growth > 0 && <span style={{ color: 'var(--ok)' }}>▲ {fmtViews(growth)}</span>}
+          {isVideo ? (
+            <>
+              <span>👁 {fmtViews(ad.latestViews)}</span>
+              {ad.latestLikes != null && <span>👍 {fmtViews(ad.latestLikes)}</span>}
+              {growth != null && growth > 0 && <span style={{ color: 'var(--ok)' }}>▲ {fmtViews(growth)}</span>}
+            </>
+          ) : (
+            // 이미지/텍스트 광고: 조회수 없음 → 문구 요약 표시
+            ad.headline && <span className="muted" style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.headline}</span>
+          )}
           {ad.daysShown != null && <span>📅 {ad.daysShown}일</span>}
         </div>
       </div>

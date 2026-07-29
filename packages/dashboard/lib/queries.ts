@@ -35,10 +35,16 @@ export interface AdCard {
   daysShown: number | null;
   youtubeVideoId: string | null;
   thumbnailPath: string | null;
+  imageUrl: string | null;
+  headline: string | null;
   landingUrl: string | null;
   latestViews: number | null;
   latestLikes: number | null;
 }
+
+// 수집·표시 스코프 — COLLECT_FORMATS='all'이면 모든 형식 표시, 아니면 비디오만(원래 동작).
+// 되돌리려면 이 env 값만 'video'로 바꾸면 됨.
+const SHOW_ALL_FORMATS = process.env.COLLECT_FORMATS === 'all';
 
 // 각 광고의 최신 조회수 스냅샷 서브쿼리.
 // ⚠️ Drizzle 의 ${ads.id} 는 한정자 없이 "id" 로 렌더돼 서브쿼리 내 다른 테이블(ad_metrics.id)에
@@ -58,9 +64,13 @@ const latestLikesSql = sql<number>`(
 
 /** 레퍼런스 리스트 (메인) — 경쟁사명 조인 + 최신 조회수, 정렬·필터 */
 export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
-  // 조회수가 확인되지 않는 영상(비-YouTube·비공개·삭제·미스냅샷)은 목록에서 숨긴다.
-  // (데이터는 보존 — 이후 조회수가 잡히면 자동으로 다시 노출)
-  const conds = [sql`${latestViewsSql} IS NOT NULL`];
+  // 조회수가 확인되지 않는 영상(비-YouTube·비공개·삭제·미스냅샷)은 목록에서 숨긴다(데이터는 보존).
+  // SHOW_ALL_FORMATS('all')이면 이미지/텍스트는 조회수가 원래 없으므로 항상 표시하고, 비디오만 조회수 조건 적용.
+  const conds = [
+    SHOW_ALL_FORMATS
+      ? sql`(${ads.format} <> 'video' OR ${latestViewsSql} IS NOT NULL)`
+      : sql`${latestViewsSql} IS NOT NULL`,
+  ];
   if (filter.competitorId) conds.push(eq(ads.competitorId, filter.competitorId));
   if (filter.format) conds.push(eq(ads.format, filter.format));
   if (filter.minViews && filter.minViews > 0) {
@@ -91,6 +101,8 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
       daysShown: ads.daysShown,
       youtubeVideoId: ads.youtubeVideoId,
       thumbnailPath: ads.thumbnailPath,
+      imageUrl: ads.imageUrl,
+      headline: ads.headline,
       landingUrl: ads.landingUrl,
       latestViews: latestViewsSql,
       latestLikes: latestLikesSql,
@@ -148,6 +160,8 @@ export async function bestAds(period: BestPeriod, minViews = 0, from?: string, t
       daysShown: ads.daysShown,
       youtubeVideoId: ads.youtubeVideoId,
       thumbnailPath: ads.thumbnailPath,
+      imageUrl: ads.imageUrl,
+      headline: ads.headline,
       landingUrl: ads.landingUrl,
       latestViews: latestViewsSql,
       latestLikes: latestLikesSql,
@@ -188,6 +202,8 @@ export async function getAd(id: string): Promise<AdDetailView | null> {
       daysShown: ads.daysShown,
       youtubeVideoId: ads.youtubeVideoId,
       thumbnailPath: ads.thumbnailPath,
+      imageUrl: ads.imageUrl,
+      headline: ads.headline,
       landingUrl: ads.landingUrl,
       landingDomain: ads.landingDomain,
       videoUrl: ads.videoUrl,

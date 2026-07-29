@@ -1,4 +1,4 @@
-import type { AdListItem, NewAdQueueMessage } from '@adref/core';
+import { isFormatAllowed, type AdListItem, type NewAdQueueMessage } from '@adref/core';
 import type { HandlerDeps } from './context.js';
 import { collectAdDetail } from './collectAdDetail.js';
 
@@ -68,10 +68,10 @@ export async function collectForCompetitor(
       apiCalls += listCalls;
       quota.record(listCalls);
 
-      // 스코프: 비디오 광고만
-      const video = items.filter((i) => i.format === 'video');
-      const existing = await repos.ads.existingCreativeIds(video.map((i) => i.creativeId));
-      for (const it of video) if (!existing.has(it.creativeId)) fresh.push(it);
+      // 스코프: COLLECT_FORMATS 에 따라 비디오만(기본) 또는 전체(all)
+      const scoped = items.filter((i) => isFormatAllowed(i.format, env.COLLECT_FORMATS));
+      const existing = await repos.ads.existingCreativeIds(scoped.map((i) => i.creativeId));
+      for (const it of scoped) if (!existing.has(it.creativeId)) fresh.push(it);
 
       if (fresh.length >= maxTotal || !nextPageToken) break;
       pageToken = nextPageToken;

@@ -76,6 +76,8 @@ export async function collectAdDetail(deps: HandlerDeps, msg: NewAdQueueMessage)
     videoUrl: detail.videoUrl,
     youtubeVideoId,
     publishedAt: stats?.publishedAt ? new Date(stats.publishedAt) : null,
+    imageUrl: detail.imageUrl,
+    headline: detail.headline,
     thumbnailPath,
     landingUrl: detail.landingUrl,
     landingDomain: landingDomain(detail.landingUrl),

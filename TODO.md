@@ -142,6 +142,7 @@
 - [x] **좋아요순 정렬** — 목록 정렬에 "좋아요순"(latestLikes desc) 추가(최신/조회수/좋아요/게재기간)
 - [x] **게재 기간 필터** — "언제부터~언제까지" 날짜 범위 입력(네이티브 date input: 캘린더 선택+직접 입력). 게재 기간이 범위와 **겹치는** 광고 필터(null 게재일은 열린 구간). 일반·베스트 공통, 다른 필터와 조합 유지
 - [x] **조회수 미확인 영상 숨김** — 최신 스냅샷 조회수가 없는 광고(비-YouTube·비공개·삭제)를 목록에서 제외(`latestViews IS NOT NULL`). 비파괴(데이터 보존 → 이후 조회수 잡히면 자동 재노출), 베스트 뷰는 기존부터 제외됨
+- [x] **수집 스코프 전체 확장(텍스트·이미지 포함)** — `COLLECT_FORMATS` env(video/all)로 제어, `isFormatAllowed` 헬퍼로 수집기·대시보드 공통 필터(되돌리기=env만 변경). `ads.image_url`·`headline` 컬럼 추가(마이그레이션 0002). 어댑터(SerpApi `c.image`, 크롤/확장 best-effort 이미지·헤드라인 추출), ingest·collectAdDetail 저장, 대시보드 카드·상세(이미지 표시·텍스트 headline·비디오만 조회수/그래프) 반영. **조사 결론: 텍스트/이미지 광고는 조회수·클릭수 없음**(투명성 센터는 상업광고 engagement 미공개, 정치광고만 노출·비용 range). 테스트 6건
 - [x] **브라우저 확장 수집(봇 차단 회피)** — 서버 직접 크롤이 Google `/sorry`(비정상 트래픽)에 막혀, 실제 사용자 Chrome 의 first-party 요청으로 수집하는 MV3 확장(`tools/chrome-extension/`) 구현. 백엔드 `POST /api/ingest`·`/api/known`·`GET /api/advertisers`(CORS), `ingestCreatives` 핸들러(멱등 upsert + YouTube 스냅샷, 비디오만). 신규만 상세 요청·차단 감지 자동 중단. 테스트 4건
 - [x] **최신순 = 영상 게시일 기준** — 기존 최신순은 수집 시각(collectedAt) 기준이었음. YouTube `snippet.publishedAt` 을 `ads.published_at` 에 저장(수집 시 collectAdDetail·일별 collectViewCounts 백필)하고, 최신순을 `coalesce(published_at, first_shown, collected_at)` desc 로 정렬. 마이그레이션 0001, 기존 278건 백필
 

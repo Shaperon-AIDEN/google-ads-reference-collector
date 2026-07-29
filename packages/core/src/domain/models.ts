@@ -6,6 +6,14 @@
 export type AdFormat = 'video' | 'image' | 'text';
 
 /**
+ * 수집·표시 스코프에 맞는 format 필터. COLLECT_FORMATS='video'(기본)이면 비디오만,
+ * 'all'이면 전부 통과. 수집기·대시보드가 공통으로 사용해 스코프를 한 곳에서 제어한다.
+ */
+export function isFormatAllowed(format: AdFormat, scope: 'video' | 'all'): boolean {
+  return scope === 'all' || format === 'video';
+}
+
+/**
  * 상세 수집기 큐 메시지 본문 (목록 → 상세 수집기로 전달).
  * 실측상 format·게재일·게재일수는 목록에만 있으므로, 상세 수집기가 완전한 upsert 를
  * 할 수 있도록 목록 스냅샷을 함께 전달한다.

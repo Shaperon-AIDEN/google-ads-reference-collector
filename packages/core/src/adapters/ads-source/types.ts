@@ -22,6 +22,7 @@ export interface AdListItem {
 export interface AdDetail {
   creativeId: string;
   videoUrl?: string; // video_link (youtube embed URL 등)
+  imageUrl?: string; // image (이미지 광고 크리에이티브 URL)
   landingUrl?: string; // visible_link
   headline?: string;
   channelName?: string;

@@ -52,6 +52,15 @@ function extractYouTubeId(html: string): string | undefined {
   return field?.[1];
 }
 
+/** content.js 미리보기에서 이미지 광고 크리에이티브 URL 추출 (best-effort).
+ *  Google 디스플레이 이미지는 /simgad/ 경로 또는 googleusercontent/tpc.googlesyndication 에서 서빙됨. */
+function extractImageUrl(html: string): string | undefined {
+  const m = html.match(
+    /https?:\\?\/\\?\/[^"'\\ )]*(?:\/simgad\/|googleusercontent\.com|tpc\.googlesyndication\.com)[^"'\\ )]*/i,
+  );
+  return m ? m[0].replace(/\\\//g, '/') : undefined;
+}
+
 /** \xNN 16진 이스케이프 복원 */
 function unescapeHex(s: string): string {
   return s.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
@@ -183,20 +192,24 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     const previewUrl = ((variations[0]?.['1'] as Json | undefined)?.['4'] as string | undefined) ?? undefined;
 
     let videoUrl: string | undefined;
+    let imageUrl: string | undefined;
     let landingUrl: string | undefined;
+    let headline: string | undefined;
     if (previewUrl) {
       try {
         const html = await this.t.get(previewUrl);
         const ytId = extractYouTubeId(html);
         if (ytId) videoUrl = `https://www.youtube.com/embed/${ytId}`;
+        else imageUrl = extractImageUrl(html); // 비디오가 아니면 이미지 크리에이티브 시도(best-effort)
         landingUrl = extractLandingUrl(html); // visible_url → 랜딩. landing_domain 은 핸들러가 계산
+        headline = fieldValue(html, 'headline') ?? fieldValue(html, 'body_text');
       } catch {
         // 미리보기 fetch 실패는 상세 저장을 막지 않는다
       }
     }
 
     return {
-      detail: { creativeId: p.creativeId, videoUrl, landingUrl, raw: json },
+      detail: { creativeId: p.creativeId, videoUrl, imageUrl, landingUrl, headline, raw: json },
       apiCalls: 0,
     };
   }

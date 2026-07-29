@@ -47,6 +47,13 @@ function extractLandingUrl(html) {
   }
   return undefined;
 }
+// 이미지 광고 크리에이티브 URL (best-effort) — Google 디스플레이 이미지는 /simgad/ 또는 googleusercontent/tpc
+function extractImageUrl(html) {
+  const m = html.match(
+    /https?:\\?\/\\?\/[^"'\\ )]*(?:\/simgad\/|googleusercontent\.com|tpc\.googlesyndication\.com)[^"'\\ )]*/i,
+  );
+  return m ? m[0].replace(/\\\//g, '/') : undefined;
+}
 
 // --- 백그라운드 워커 경유 (cross-origin 권한) ---
 function bg(msg) {
@@ -104,40 +111,41 @@ async function getDetail(advertiserId, creativeId) {
   const json = await rpc('LookupService/GetCreativeById', { 1: advertiserId, 2: creativeId, 5: { 1: 1, 2: 0, 3: 2410 } });
   const variations = (json['1'] && json['1']['5']) || [];
   const previewUrl = variations[0] && variations[0]['1'] && variations[0]['1']['4'];
-  let videoUrl, landingUrl, youtubeVideoId;
+  let videoUrl, imageUrl, landingUrl, headline, youtubeVideoId;
   if (previewUrl) {
     const r = await bg({ type: 'fetchText', url: previewUrl });
     if (r && r.ok && r.text) {
       youtubeVideoId = extractYouTubeId(r.text);
       if (youtubeVideoId) videoUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
+      else imageUrl = extractImageUrl(r.text); // 비디오가 아니면 이미지 크리에이티브(best-effort)
       landingUrl = extractLandingUrl(r.text);
     }
   }
-  return { youtubeVideoId, videoUrl, landingUrl };
+  return { youtubeVideoId, videoUrl, imageUrl, landingUrl, headline };
 }
 
 async function collectAdvertiser(advertiserId, cfg) {
   const base = cfg.ingestBase.replace(/\/$/, '');
   report({ phase: 'list', advertiserId, message: '목록 조회 중…' });
 
-  // 1) 전체 페이지네이션 → 비디오 크리에이티브 목록
-  const videos = [];
+  // 1) 전체 페이지네이션 → 모든 크리에이티브 목록 (백엔드가 COLLECT_FORMATS 로 스코프 필터)
+  const all = [];
   let token, pages = 0;
   while (pages < 300) {
     const { items, next } = await listPage(advertiserId, cfg.region, cfg.num, token);
-    for (const it of items) if (it.format === 'video') videos.push(it);
+    for (const it of items) all.push(it);
     pages += 1;
-    report({ phase: 'list', advertiserId, message: `목록 ${pages}페이지, 비디오 ${videos.length}건` });
+    report({ phase: 'list', advertiserId, message: `목록 ${pages}페이지, ${all.length}건` });
     if (!next) break;
     token = next;
     await sleep(jitter(cfg.delayMs));
   }
 
   // 2) 이미 저장된 것 제외 (신규만 상세 요청 → 요청 수·차단 위험 최소화)
-  const knownRes = await bg({ type: 'post', url: `${base}/known`, body: { creativeIds: videos.map((v) => v.creativeId) } });
+  const knownRes = await bg({ type: 'post', url: `${base}/known`, body: { creativeIds: all.map((v) => v.creativeId) } });
   const known = new Set((knownRes && knownRes.ok && knownRes.data && knownRes.data.known) || []);
-  const fresh = videos.filter((v) => !known.has(v.creativeId));
-  report({ phase: 'detail', advertiserId, message: `비디오 ${videos.length}건 중 신규 ${fresh.length}건 상세 수집 시작` });
+  const fresh = all.filter((v) => !known.has(v.creativeId));
+  report({ phase: 'detail', advertiserId, message: `${all.length}건 중 신규 ${fresh.length}건 상세 수집 시작` });
 
   // 3) 신규만 상세 수집 (페이싱)
   const ads = [];
@@ -163,7 +171,7 @@ async function collectAdvertiser(advertiserId, cfg) {
     const res = await bg({ type: 'post', url: `${base}/ingest`, body: { advertiserId, ads } });
     saved = res && res.ok ? res.data : { error: (res && res.error) || (res && res.data && res.data.error) };
   }
-  return { advertiserId, videos: videos.length, fresh: fresh.length, collected: ads.length, saved };
+  return { advertiserId, total: all.length, fresh: fresh.length, collected: ads.length, saved };
 }
 
 // popup → content 명령 수신

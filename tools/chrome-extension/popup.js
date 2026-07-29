@@ -87,7 +87,7 @@ chrome.runtime.onMessage.addListener((msg) => {
     log('=== 완료 ===');
     for (const r of msg.results || []) {
       if (r.error) log(`  ${r.advertiserId}: 오류 ${r.error}`);
-      else log(`  ${r.advertiserId}: 비디오 ${r.videos} / 신규 ${r.fresh} / 저장 ${r.saved ? (r.saved.savedVideo ?? '?') : 0}`);
+      else log(`  ${r.advertiserId}: 전체 ${r.total} / 신규 ${r.fresh} / 저장 ${r.saved ? (r.saved.saved ?? '?') : 0}`);
     }
   } else {
     log(`[${msg.phase}] ${msg.advertiserId || ''} ${msg.message || ''}`);

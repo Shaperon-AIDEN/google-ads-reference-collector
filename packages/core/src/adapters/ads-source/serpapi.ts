@@ -188,6 +188,7 @@ export class SerpApiAdsSource implements AdsSource {
     const detail: AdDetail = {
       creativeId: p.creativeId,
       videoUrl: asString(first.video_link),
+      imageUrl: asString(first.image),
       landingUrl: asString(first.visible_link),
       headline: asString(first.headline),
       channelName: asString(first.channel_name),
