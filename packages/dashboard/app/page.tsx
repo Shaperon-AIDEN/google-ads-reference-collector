@@ -260,6 +260,17 @@ async function GroupedView({
             </span>
           </Link>
         ))}
+        <span className="muted" style={{ marginLeft: 16 }}>형식:</span>
+        <Link href={qs({ format: '' })}>
+          <span className={`badge ${!format ? 'ok' : ''}`}>전체</span>
+        </Link>
+        {(['video', 'image', 'text'] as const).map((f) => (
+          <Link key={f} href={qs({ format: f })}>
+            <span className={`badge ${format === f ? 'ok' : ''}`}>
+              {f === 'video' ? '비디오' : f === 'image' ? '이미지' : '텍스트'}
+            </span>
+          </Link>
+        ))}
         <span className="muted" style={{ marginLeft: 16 }}>경쟁사:</span>
         <Link href={qs({ competitor: '' })}>
           <span className={`badge ${!competitor ? 'ok' : ''}`}>전체</span>
