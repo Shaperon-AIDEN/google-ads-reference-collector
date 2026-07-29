@@ -106,16 +106,24 @@ describe('ingestCreatives', () => {
     expect(img.landingDomain).toBe('shop.example.com');
   });
 
-  it('서버측 안전망: 확장이 로고 URL(/simgad/, archive없음)을 보내도 imageUrl 은 null 로 저장', async () => {
+  it('서버측 안전망: HTML 자산 URL(/pagead/·sadbundle)은 imageUrl 을 null 로 거부', async () => {
+    // 로고 제외는 확장(픽셀 크기 측정)이 담당하고, 서버는 명백한 비이미지(HTML 자산)만 URL 로 거른다.
+    // content.js 유래 광고 이미지는 로고와 같은 /simgad/ 경로라 서버가 /simgad/ 를 막으면 안 됨.
     const repos = ingestRepos({ id: 'c1', name: '드래프터' });
     const deps = makeDeps({ repos: repos as never, youtube: new FakeYouTube([]), env: { COLLECT_FORMATS: 'all' } as never });
 
     await ingestCreatives(deps, {
       advertiserId: 'AR1',
-      ads: [{ creativeId: 'CR_logo', format: 'image', imageUrl: 'https://tpc.googlesyndication.com/simgad/LOGO' }],
+      ads: [
+        { creativeId: 'CR_html', format: 'image', imageUrl: 'https://tpc.googlesyndication.com/pagead/gadgets/discover_ads.html' },
+        { creativeId: 'CR_ad', format: 'image', imageUrl: 'https://tpc.googlesyndication.com/simgad/REAL_AD' },
+      ],
     });
 
-    expect(repos.upserts[0]!.imageUrl).toBeNull(); // 로고는 거부
+    const html = repos.upserts.find((u) => u.creativeId === 'CR_html')!;
+    const ad = repos.upserts.find((u) => u.creativeId === 'CR_ad')!;
+    expect(html.imageUrl).toBeNull(); // HTML 자산 거부
+    expect(ad.imageUrl).toBe('https://tpc.googlesyndication.com/simgad/REAL_AD'); // /simgad/ 광고는 허용
   });
 
   it('YouTube 통계가 없으면 저장은 하되 스냅샷은 없음', async () => {

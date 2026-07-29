@@ -47,7 +47,19 @@ function extractLandingUrl(html) {
   }
   return undefined;
 }
-// 이미지 광고 크리에이티브 URL (best-effort, 폴백) — /simgad/ 또는 googleusercontent 만 매칭(오탐 방지)
+// 미리보기 content.js 안의 모든 이미지(simgad/googleusercontent) 후보 URL 추출(중복 제거, 쿼리 제거).
+// content.js 의 이미지는 /archive 없는 /simgad/ 경로라 경로로는 로고/광고를 못 나눈다 → 크기로 판별.
+function imageCandidatesFromPreview(html) {
+  const re = /https?:\\?\/\\?\/[^"'\\ )]*(?:\/simgad\/|googleusercontent\.com\/)[^"'\\ )]*/gi;
+  const out = [];
+  let m;
+  while ((m = re.exec(html))) {
+    const url = m[0].replace(/\\\//g, '/').replace(/[?&].*$/, ''); // 쿼리(?w=…) 제거
+    if (!out.includes(url)) out.push(url);
+  }
+  return out;
+}
+// (구) 단일 폴백 — 크롤 어댑터 호환용. 확장은 imageCandidatesFromPreview + 크기측정을 쓴다.
 function extractImageUrl(html) {
   const m = html.match(/https?:\\?\/\\?\/[^"'\\ )]*(?:\/simgad\/|googleusercontent\.com\/)[^"'\\ )]*/i);
   return m ? m[0].replace(/\\\//g, '/') : undefined;
@@ -63,6 +75,26 @@ function report(p) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function jitter(base) {
   return base + Math.floor(Math.random() * base);
+}
+
+// 이미지 후보들의 실제 크기를 재서 광고 크리에이티브를 고른다.
+// 로고는 보통 정사각(ar≈1)·작음, 광고는 배너 비율. → 64px 초과 & 정사각 아님(0.8~1.25 밖) 우선,
+// 없으면 가장 큰 것. 각 후보는 background 가 createImageBitmap 으로 측정.
+async function pickBestImage(urls) {
+  if (!urls || urls.length === 0) return undefined;
+  const measured = [];
+  for (const url of urls) {
+    const s = await bg({ type: 'imageSize', url });
+    if (s && s.ok && s.w > 0 && s.h > 0) measured.push({ url, w: s.w, h: s.h });
+  }
+  if (measured.length === 0) return undefined;
+  // ⓘ 아이콘·작은 로고(<=64px) 제외, ~정사각(비율 0.9~1.15)=브랜드 로고 제외 → 배너 크리에이티브만
+  const big = measured.filter((m) => Math.max(m.w, m.h) > 64);
+  const banner = big.filter((m) => !(m.w / m.h >= 0.9 && m.w / m.h <= 1.15));
+  const pool = banner.length ? banner : big;
+  if (pool.length === 0) return undefined; // 전부 아이콘/로고
+  pool.sort((a, b) => b.w * b.h - a.w * a.h);
+  return pool[0].url;
 }
 
 // --- same-origin RPC (실제 세션) ---
@@ -159,7 +191,7 @@ async function getDetail(advertiserId, creativeId) {
     if (r && r.ok && r.text) {
       youtubeVideoId = extractYouTubeId(r.text);
       if (youtubeVideoId) videoUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
-      else if (!imageUrl) imageUrl = extractImageUrl(r.text); // 폴백
+      else if (!imageUrl) imageUrl = await pickBestImage(imageCandidatesFromPreview(r.text)); // 크기로 로고 제외
       landingUrl = extractLandingUrl(r.text);
     }
   }
