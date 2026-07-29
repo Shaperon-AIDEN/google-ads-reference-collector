@@ -32,8 +32,9 @@ function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: 
     <Link href={`/ads/${ad.id}`} className="card">
       <div style={{ position: 'relative' }}>
         {thumb ? (
+          // loading="lazy": 화면에 보일 때만 로드 → YouTube 썸네일 대량 동시요청 스로틀링(빈 칸) 방지
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="thumb" src={thumb} alt={ad.creativeId} style={{ objectFit: 'cover' }} />
+          <img className="thumb" src={thumb} alt={ad.creativeId} loading="lazy" decoding="async" style={{ objectFit: 'cover' }} />
         ) : (
           <div className="thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12, textAlign: 'center' }}>
             {ad.headline ? (
