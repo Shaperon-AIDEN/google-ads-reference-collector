@@ -91,7 +91,7 @@ describe('ingestCreatives', () => {
     const result = await ingestCreatives(deps, {
       advertiserId: 'AR1',
       ads: [
-        { creativeId: 'CR_img', format: 'image', imageUrl: 'https://img/simgad/1', headline: '헤드라인', landingUrl: 'https://shop.example.com/x' },
+        { creativeId: 'CR_img', format: 'image', imageUrl: 'https://tpc.googlesyndication.com/archive/simgad/1', headline: '헤드라인', landingUrl: 'https://shop.example.com/x' },
         { creativeId: 'CR_txt', format: 'text', headline: '텍스트 광고 문구' },
       ],
     });
@@ -101,9 +101,21 @@ describe('ingestCreatives', () => {
     expect(result.snapshots).toBe(0); // 비-비디오는 조회수 없음
     expect(repos.upserts.map((u) => u.format).sort()).toEqual(['image', 'text']);
     const img = repos.upserts.find((u) => u.creativeId === 'CR_img')!;
-    expect(img.imageUrl).toBe('https://img/simgad/1');
+    expect(img.imageUrl).toBe('https://tpc.googlesyndication.com/archive/simgad/1');
     expect(img.headline).toBe('헤드라인');
     expect(img.landingDomain).toBe('shop.example.com');
+  });
+
+  it('서버측 안전망: 확장이 로고 URL(/simgad/, archive없음)을 보내도 imageUrl 은 null 로 저장', async () => {
+    const repos = ingestRepos({ id: 'c1', name: '드래프터' });
+    const deps = makeDeps({ repos: repos as never, youtube: new FakeYouTube([]), env: { COLLECT_FORMATS: 'all' } as never });
+
+    await ingestCreatives(deps, {
+      advertiserId: 'AR1',
+      ads: [{ creativeId: 'CR_logo', format: 'image', imageUrl: 'https://tpc.googlesyndication.com/simgad/LOGO' }],
+    });
+
+    expect(repos.upserts[0]!.imageUrl).toBeNull(); // 로고는 거부
   });
 
   it('YouTube 통계가 없으면 저장은 하되 스냅샷은 없음', async () => {

@@ -1,4 +1,4 @@
-import { isFormatAllowed, landingDomain, parseYouTubeId, type AdFormat } from '@adref/core';
+import { isFormatAllowed, isRealCreativeUrl, landingDomain, parseYouTubeId, type AdFormat } from '@adref/core';
 import type { HandlerDeps } from './context.js';
 
 /** Chrome 확장이 실제 브라우저에서 수집해 보낸 크리에이티브 1건 */
@@ -100,7 +100,8 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
         videoUrl: ad.videoUrl ?? (youtubeVideoId ? `https://www.youtube.com/embed/${youtubeVideoId}` : null),
         youtubeVideoId: youtubeVideoId ?? null,
         publishedAt: stats?.publishedAt ? new Date(stats.publishedAt) : null,
-        imageUrl: ad.imageUrl ?? null,
+        // 서버측 재검증: 확장이 (옛 코드로) 로고/HTML URL 을 보내도 여기서 거른다(안전망).
+        imageUrl: ad.imageUrl && isRealCreativeUrl(ad.imageUrl) ? ad.imageUrl : null,
         headline: ad.headline ?? null,
         thumbnailPath: null, // 대시보드는 youtube_video_id 로 썸네일 URL 유도 (Blob 불필요)
         landingUrl: ad.landingUrl ?? null,
