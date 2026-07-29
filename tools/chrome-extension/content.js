@@ -66,9 +66,10 @@ function jitter(base) {
 }
 
 // --- same-origin RPC (실제 세션) ---
-// credentials:'omit' — 쿠키를 보내면 anji 엔드포인트가 인증 요청으로 간주해 SAPISIDHASH 헤더를
-// 요구하며 400 을 반환한다. 투명성 센터는 공개 데이터라 curl 처럼 익명 호출해야 정상 동작한다.
-// (실제 브라우저의 TLS 지문·IP·Origin/Referer 이점은 쿠키와 무관하게 유지 → /sorry 회피는 그대로)
+// credentials:'include' — CAPTCHA 를 풀면 받는 면제 쿠키(GOOGLE_ABUSE_EXEMPTION)를 함께 보내
+// /sorry 차단을 우회하기 위함. ⚠️ 단 로그인 상태면 SAPISID 쿠키가 실려 anji 엔드포인트가
+// SAPISIDHASH 헤더를 요구하며 400 을 반환한다(content script 는 httpOnly SAPISID 를 못 읽어
+// 해시 생성 불가). → **Google 에서 로그아웃한 브라우저/프로필**에서 사용해야 한다.
 async function rpc(path, reqObj) {
   let res;
   try {
@@ -76,7 +77,7 @@ async function rpc(path, reqObj) {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8' },
       body: 'f.req=' + encodeURIComponent(JSON.stringify(reqObj)),
-      credentials: 'omit',
+      credentials: 'include',
       // redirect:'manual' — 차단 시 /sorry(다른 오리진)로 302 되는데, 이를 따라가면 CORS 로
       // "Failed to fetch" 가 난다. manual 이면 opaqueredirect(status 0) 로 받아 차단 감지 가능.
       redirect: 'manual',
@@ -90,6 +91,7 @@ async function rpc(path, reqObj) {
   const text = await res.text();
   const t = text.trimStart();
   if (t.startsWith('<')) throw new Error('BLOCKED'); // HTML = 차단 페이지
+  if (res.status === 400) throw new Error('RPC 400: Google 로그인 상태로 보임 — 로그아웃한 브라우저/프로필에서 실행하세요(SAPISID 쿠키 충돌).');
   if (!res.ok) throw new Error(`RPC ${res.status}: ${t.slice(0, 80)}`);
   // Google 은 JSON 하이재킹 방지로 )]}' 접두어를 붙일 수 있음 → 정상 응답
   return JSON.parse(t.replace(/^\)\]\}'\s*/, ''));
