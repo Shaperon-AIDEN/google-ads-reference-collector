@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { AdFormat } from '../../domain/models.js';
+import { isRealCreativeUrl, type AdFormat } from '../../domain/models.js';
 import type {
   AdDetail,
   AdListItem,
@@ -64,11 +64,6 @@ function extractImageUrl(html: string): string | undefined {
  * 이미지 광고는 GetCreativeById 응답 variation 의 `['3']['2']` 에 `<img src="...simgad...">` HTML 이
  * 직접 들어있다(미리보기 fetch 불필요). 첫 유효 img src 를 반환. (비디오·텍스트는 대신 `['1']['4']` 미리보기 URL)
  */
-// 실제 광고 크리에이티브는 /archive/simgad/ 경로. archive 없는 /simgad/ 는 광고주 로고(크기 무관),
-// /pagead/ 는 HTML 자산 → 둘 다 제외해 로고 오수집 방지.
-function isRealCreativeUrl(u: string): boolean {
-  return /\/archive\/simgad\/|googleusercontent\.com\//.test(u) && !/\/pagead\//.test(u);
-}
 function imageFromVariations(variations: Json[]): string | undefined {
   for (const v of variations) {
     const inner = v?.['3'] as Json | undefined;
