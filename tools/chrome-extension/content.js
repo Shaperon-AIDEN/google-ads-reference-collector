@@ -68,21 +68,23 @@ function jitter(base) {
 }
 
 // --- same-origin RPC (실제 세션) ---
+// credentials:'omit' — 쿠키를 보내면 anji 엔드포인트가 인증 요청으로 간주해 SAPISIDHASH 헤더를
+// 요구하며 400 을 반환한다. 투명성 센터는 공개 데이터라 curl 처럼 익명 호출해야 정상 동작한다.
+// (실제 브라우저의 TLS 지문·IP·Origin/Referer 이점은 쿠키와 무관하게 유지 → /sorry 회피는 그대로)
 async function rpc(path, reqObj) {
   const res = await fetch(`${RPC_BASE}/${path}?authuser=0`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8' },
     body: 'f.req=' + encodeURIComponent(JSON.stringify(reqObj)),
-    credentials: 'include',
+    credentials: 'omit',
   });
   const text = await res.text();
   const t = text.trimStart();
-  if (!res.ok || t.startsWith('<') || t.startsWith(')]}')) {
-    if (t.startsWith('<') || res.status === 302) throw new Error('BLOCKED'); // /sorry 등
-    if (t.startsWith(')]}')) return JSON.parse(t.replace(/^\)\]\}'\s*/, ''));
-    throw new Error(`RPC ${res.status}`);
-  }
-  return JSON.parse(text);
+  // HTML/리다이렉트 = /sorry 봇 차단
+  if (t.startsWith('<') || res.status === 302) throw new Error('BLOCKED');
+  if (!res.ok) throw new Error(`RPC ${res.status}: ${t.slice(0, 80)}`); // 본문 앞부분으로 원인 파악
+  // Google 은 JSON 하이재킹 방지로 )]}' 접두어를 붙일 수 있음 → 정상 응답
+  return JSON.parse(t.replace(/^\)\]\}'\s*/, ''));
 }
 
 async function listPage(advertiserId, region, num, pageToken) {
