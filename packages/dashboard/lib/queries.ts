@@ -43,8 +43,8 @@ export interface AdCard {
 }
 
 // 수집·표시 스코프 — COLLECT_FORMATS='all'이면 모든 형식 표시, 아니면 비디오만(원래 동작).
-// 되돌리려면 이 env 값만 'video'로 바꾸면 됨.
-const SHOW_ALL_FORMATS = process.env.COLLECT_FORMATS === 'all';
+// 되돌리려면 이 env 값만 'video'로 바꾸면 됨. (모듈 로드 시 1회가 아니라 호출마다 읽어 env 변경 즉시 반영)
+const showAllFormats = () => process.env.COLLECT_FORMATS === 'all';
 
 // 각 광고의 최신 조회수 스냅샷 서브쿼리.
 // ⚠️ Drizzle 의 ${ads.id} 는 한정자 없이 "id" 로 렌더돼 서브쿼리 내 다른 테이블(ad_metrics.id)에
@@ -67,7 +67,7 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
   // 조회수가 확인되지 않는 영상(비-YouTube·비공개·삭제·미스냅샷)은 목록에서 숨긴다(데이터는 보존).
   // SHOW_ALL_FORMATS('all')이면 이미지/텍스트는 조회수가 원래 없으므로 항상 표시하고, 비디오만 조회수 조건 적용.
   const conds = [
-    SHOW_ALL_FORMATS
+    showAllFormats()
       ? sql`(${ads.format} <> 'video' OR ${latestViewsSql} IS NOT NULL)`
       : sql`${latestViewsSql} IS NOT NULL`,
   ];
@@ -111,7 +111,7 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
     .innerJoin(competitors, eq(competitors.id, ads.competitorId))
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(order)
-    .limit(500);
+    .limit(2000); // 표시 대상 전체 확보 (500 이면 형식·경쟁사에 따라 뒤쪽이 잘림 — 특히 조회수 없는 이미지/텍스트)
 
   return rows.map((r) => ({
     ...r,
