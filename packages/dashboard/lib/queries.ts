@@ -76,6 +76,11 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
   if (filter.minViews && filter.minViews > 0) {
     conds.push(sql`${latestViewsSql} >= ${filter.minViews}`);
   }
+  // 조회수·좋아요 기반 필터/정렬 시 → 해당 데이터가 없는 텍스트/이미지 광고는 제외(비디오만).
+  // 단 사용자가 형식을 명시적으로 고른 경우(filter.format)엔 그 선택을 존중한다.
+  const byMetric =
+    filter.sort === 'views' || filter.sort === 'likes' || (filter.minViews != null && filter.minViews > 0);
+  if (byMetric && !filter.format) conds.push(eq(ads.format, 'video'));
   conds.push(...periodOverlapConds(filter.from, filter.to));
 
   // 최신순 = 영상 게시일(publishedAt) 기준. 없으면 게재 시작일 → 수집 시각 폴백.

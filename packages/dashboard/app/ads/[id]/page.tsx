@@ -142,6 +142,18 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
             <tr><th>랜딩 URL</th><td>{ad.landingUrl ? <a href={ad.landingUrl} target="_blank" rel="noreferrer">{ad.landingUrl}</a> : '—'}</td></tr>
             <tr><th>랜딩 도메인</th><td>{ad.landingDomain ?? '—'}</td></tr>
             <tr><th>크리에이티브 ID</th><td style={{ fontFamily: 'monospace', fontSize: 12 }}>{ad.creativeId}</td></tr>
+            <tr>
+              <th>투명성 센터</th>
+              <td>
+                <a
+                  href={`https://adstransparency.google.com/advertiser/${ad.advertiserId}/creative/${ad.creativeId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  원본 광고 보기 ↗
+                </a>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
