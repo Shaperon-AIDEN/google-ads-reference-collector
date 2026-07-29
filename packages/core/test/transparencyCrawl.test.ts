@@ -121,6 +121,38 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/archive/simgad/AD'); // 대형이어도 로고는 제외
   });
 
+  it('getAdDetail: AdChoices ⓘ 아이콘(24x24, /archive/simgad/)은 건너뛰고 실제 크리에이티브 선택', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': {
+          '5': [
+            {
+              '3': {
+                '2':
+                  '<img src="https://tpc.googlesyndication.com/archive/simgad/ICON" width="24" height="24">' + // ⓘ
+                  '<img src="https://tpc.googlesyndication.com/archive/simgad/AD" width="600" height="500">',
+              },
+            },
+          ],
+        },
+      }),
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get: vi.fn() });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR' });
+    expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/archive/simgad/AD');
+  });
+
+  it('getAdDetail: 아이콘(24x24)만 있으면 imageUrl 없음', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': { '5': [{ '3': { '2': '<img src="https://tpc.googlesyndication.com/archive/simgad/ICON" width="24" height="24">' } }] },
+      }),
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get: vi.fn() });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR' });
+    expect(detail.imageUrl).toBeUndefined();
+  });
+
   it('getAdDetail: 로고(/simgad/ archive없음)만 있으면 크기 무관 imageUrl 없음', async () => {
     const rpc = vi.fn(async () =>
       JSON.stringify({

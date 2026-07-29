@@ -65,6 +65,9 @@ function extractImageUrl(html: string): string | undefined {
  * 직접 들어있다(미리보기 fetch 불필요). 첫 유효 img src 를 반환. (비디오·텍스트는 대신 `['1']['4']` 미리보기 URL)
  */
 function imageFromVariations(variations: Json[]): string | undefined {
+  // <img> 가 여러 개면(AdChoices ⓘ 아이콘·로고 + 실제 크리에이티브) width/height 로 가장 큰 것을 고른다.
+  // 작은 이미지(<=64px)는 아이콘으로 제외. 치수 미상은 후보로 유지.
+  let best: { url: string; area: number } | undefined;
   for (const v of variations) {
     const inner = v?.['3'] as Json | undefined;
     const html = typeof inner?.['2'] === 'string' ? (inner['2'] as string) : '';
@@ -72,10 +75,15 @@ function imageFromVariations(variations: Json[]): string | undefined {
     let tag: RegExpExecArray | null;
     while ((tag = re.exec(html))) {
       const src = (tag[0].match(/src=["']([^"']+)["']/i) ?? [])[1];
-      if (src && isRealCreativeUrl(src)) return src; // 첫 실제 크리에이티브
+      if (!src || !isRealCreativeUrl(src)) continue;
+      const w = Number((tag[0].match(/width=["']?(\d+)/i) ?? [])[1]) || 0;
+      const h = Number((tag[0].match(/height=["']?(\d+)/i) ?? [])[1]) || 0;
+      if (w > 0 && h > 0 && (w <= 64 || h <= 64)) continue; // ⓘ 아이콘·작은 로고 제외
+      const area = w * h || 1;
+      if (!best || area > best.area) best = { url: src, area };
     }
   }
-  return undefined;
+  return best?.url;
 }
 
 /** \xNN 16진 이스케이프 복원 */
