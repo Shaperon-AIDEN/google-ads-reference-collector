@@ -27,6 +27,9 @@
       <div><label>요청 간격(ms)</label><input id="delayMs" type="number" value="1200" /></div>
       <div><label>region</label><input id="region" value="KR" /></div>
     </div>
+    <div class="row">
+      <div><label>저장 단위(건)</label><input id="flushEvery" type="number" value="5" title="이 건수마다 DB에 저장. 1이면 상세 수집마다 저장" /></div>
+    </div>
 
     <div class="row" style="margin-top:8px">
       <button class="sec" id="load">경쟁사 불러오기</button>

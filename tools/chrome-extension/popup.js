@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { ingestBase: 'http://localhost:7071/api', num: 40, delayMs: 1200, region: 'KR' };
+const DEFAULTS = { ingestBase: 'http://localhost:7071/api', num: 40, delayMs: 1200, region: 'KR', flushEvery: 5 };
 
 function log(msg) {
   const el = $('log');
@@ -14,6 +14,7 @@ chrome.storage.local.get(['cfg'], ({ cfg }) => {
   $('num').value = c.num;
   $('delayMs').value = c.delayMs;
   $('region').value = c.region;
+  $('flushEvery').value = c.flushEvery;
 });
 function readCfg() {
   const cfg = {
@@ -21,6 +22,7 @@ function readCfg() {
     num: Number($('num').value) || 40,
     delayMs: Number($('delayMs').value) || 1200,
     region: $('region').value.trim() || 'KR',
+    flushEvery: Number($('flushEvery').value) || 5,
   };
   chrome.storage.local.set({ cfg });
   return cfg;
@@ -87,7 +89,11 @@ chrome.runtime.onMessage.addListener((msg) => {
     log('=== 완료 ===');
     for (const r of msg.results || []) {
       if (r.error) log(`  ${r.advertiserId}: 오류 ${r.error}`);
-      else log(`  ${r.advertiserId}: 전체 ${r.total} / 신규 ${r.fresh} / 저장 ${r.saved ? (r.saved.saved ?? '?') : 0}`);
+      else {
+        const saved = r.saved ? (r.saved.saved ?? '?') : 0;
+        const err = r.saved && r.saved.error ? ` (일부 저장실패: ${r.saved.error})` : '';
+        log(`  ${r.advertiserId}: 전체 ${r.total} / 신규 ${r.fresh} / 저장 ${saved}${r.blocked ? ' [차단중단]' : ''}${err}`);
+      }
     }
   } else {
     log(`[${msg.phase}] ${msg.advertiserId || ''} ${msg.message || ''}`);

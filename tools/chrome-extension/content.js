@@ -149,31 +149,53 @@ async function collectAdvertiser(advertiserId, cfg) {
   const fresh = all.filter((v) => !known.has(v.creativeId));
   report({ phase: 'detail', advertiserId, message: `${all.length}건 중 신규 ${fresh.length}건 상세 수집 시작` });
 
-  // 3) 신규만 상세 수집 (페이싱)
-  const ads = [];
+  // 3) 신규만 상세 수집 → flushEvery 건마다 즉시 저장(점진 반영·중단 시 진행분 보존)
+  const flushEvery = Math.max(1, cfg.flushEvery || 5);
+  let buffer = [];
+  let collected = 0;
+  let savedTotal = 0;
+  let lastError = null;
+
+  // 버퍼를 백엔드로 저장하고 성공 건수를 누적. 실패해도 수집은 계속(다음 flush 에서 재시도되진 않음).
+  async function flush() {
+    if (buffer.length === 0) return;
+    const batch = buffer;
+    buffer = [];
+    const res = await bg({ type: 'post', url: `${base}/ingest`, body: { advertiserId, ads: batch } });
+    if (res && res.ok && res.data) savedTotal += res.data.saved || 0;
+    else lastError = (res && res.error) || (res && res.data && res.data.error) || 'ingest 실패';
+    report({ phase: 'detail', advertiserId, message: `저장 누적 ${savedTotal}건` });
+  }
+
+  let blocked = false;
   for (let i = 0; i < fresh.length; i++) {
     const v = fresh[i];
     try {
       const d = await getDetail(advertiserId, v.creativeId);
-      ads.push({ ...v, ...d });
+      buffer.push({ ...v, ...d });
+      collected += 1;
     } catch (e) {
       if (String(e && e.message) === 'BLOCKED') {
-        report({ phase: 'blocked', advertiserId, message: `⚠️ 차단 감지 — ${ads.length}건까지 저장 후 중단` });
+        blocked = true;
+        report({ phase: 'blocked', advertiserId, message: `⚠️ 차단 감지 — 지금까지 수집분 저장 후 중단` });
         break;
       }
       // 개별 실패는 건너뜀
     }
+    if (buffer.length >= flushEvery) await flush(); // flushEvery 건마다 즉시 저장
     report({ phase: 'detail', advertiserId, message: `상세 ${i + 1}/${fresh.length}` });
     await sleep(jitter(cfg.delayMs));
   }
+  await flush(); // 잔여분(차단·종료 포함) 저장
 
-  // 4) 백엔드 저장
-  let saved = null;
-  if (ads.length > 0) {
-    const res = await bg({ type: 'post', url: `${base}/ingest`, body: { advertiserId, ads } });
-    saved = res && res.ok ? res.data : { error: (res && res.error) || (res && res.data && res.data.error) };
-  }
-  return { advertiserId, total: all.length, fresh: fresh.length, collected: ads.length, saved };
+  return {
+    advertiserId,
+    total: all.length,
+    fresh: fresh.length,
+    collected,
+    blocked,
+    saved: lastError ? { saved: savedTotal, error: lastError } : { saved: savedTotal },
+  };
 }
 
 // popup → content 명령 수신
