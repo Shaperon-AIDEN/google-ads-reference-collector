@@ -40,7 +40,9 @@ function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: 
             {ad.headline ? (
               <span style={{ fontSize: 13, color: 'var(--text)' }}>{ad.headline}</span>
             ) : (
-              <span className="muted">{ad.format}</span>
+              <span className="muted" style={{ fontSize: 12, whiteSpace: 'pre-line' }}>
+                {ad.format === 'image' ? 'HTML·디스커버 광고\n(정적 이미지 없음)' : ad.format === 'text' ? '텍스트 광고' : ad.format}
+              </span>
             )}
           </div>
         )}

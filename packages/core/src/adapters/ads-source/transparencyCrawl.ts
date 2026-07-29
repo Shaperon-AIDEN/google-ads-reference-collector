@@ -68,8 +68,10 @@ function imageFromVariations(variations: Json[]): string | undefined {
   for (const v of variations) {
     const inner = v?.['3'] as Json | undefined;
     const html = typeof inner?.['2'] === 'string' ? (inner['2'] as string) : '';
-    const m = html.match(/src=["']([^"']+)["']/i);
-    if (m?.[1]) return m[1];
+    // <img> 태그의 src 만, 실제 이미지 호스트(simgad/googleusercontent)만 — discover/HTML 광고의
+    // <iframe>/<script> src 를 이미지로 오인하지 않도록.
+    const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (m?.[1] && /\/simgad\/|googleusercontent\.com\//.test(m[1])) return m[1];
   }
   return undefined;
 }
