@@ -126,15 +126,24 @@ function isRealCreativeUrl(u) {
   return /\/archive\/simgad\/|googleusercontent\.com\//.test(u) && !/\/pagead\//.test(u);
 }
 function imageFromVariations(variations) {
+  // <img> 가 여러 개면(AdChoices ⓘ 아이콘·로고 + 실제 크리에이티브) width/height 로 가장 큰 것을 고른다.
+  // 첫 <img> 만 잡으면 24x24 ⓘ 아이콘이 선택되는 오류. 작은 이미지(<=64px)는 아이콘으로 제외.
+  let best; // { url, area }
   for (const v of variations) {
     const html = v && v['3'] && typeof v['3']['2'] === 'string' ? v['3']['2'] : '';
     const re = /<img\b[^>]*>/gi;
     let tag;
     while ((tag = re.exec(html))) {
       const src = (tag[0].match(/src=["']([^"']+)["']/i) || [])[1];
-      if (src && isRealCreativeUrl(src)) return src; // 첫 실제 크리에이티브
+      if (!src || !isRealCreativeUrl(src)) continue;
+      const w = Number((tag[0].match(/width=["']?(\d+)/i) || [])[1]) || 0;
+      const h = Number((tag[0].match(/height=["']?(\d+)/i) || [])[1]) || 0;
+      if (w > 0 && h > 0 && (w <= 64 || h <= 64)) continue; // ⓘ 아이콘·작은 로고 제외
+      const area = w * h || 1; // 치수 미상은 최소 점수(그래도 후보)
+      if (!best || area > best.area) best = { url: src, area };
     }
   }
+  if (best) return best.url;
   return undefined;
 }
 
