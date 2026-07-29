@@ -52,13 +52,26 @@ function extractYouTubeId(html: string): string | undefined {
   return field?.[1];
 }
 
-/** content.js 미리보기에서 이미지 광고 크리에이티브 URL 추출 (best-effort).
- *  Google 디스플레이 이미지는 /simgad/ 경로 또는 googleusercontent/tpc.googlesyndication 에서 서빙됨. */
+/** content.js 미리보기에서 이미지 광고 크리에이티브 URL 추출 (best-effort, 폴백용).
+ *  Google 디스플레이 이미지는 /simgad/ 또는 googleusercontent 에서 서빙됨.
+ *  (tpc.googlesyndication.com 은 JS·HTML 도 서빙하므로 /simgad/ 경로로만 한정 — 오탐 방지) */
 function extractImageUrl(html: string): string | undefined {
-  const m = html.match(
-    /https?:\\?\/\\?\/[^"'\\ )]*(?:\/simgad\/|googleusercontent\.com|tpc\.googlesyndication\.com)[^"'\\ )]*/i,
-  );
+  const m = html.match(/https?:\\?\/\\?\/[^"'\\ )]*(?:\/simgad\/|googleusercontent\.com\/)[^"'\\ )]*/i);
   return m ? m[0].replace(/\\\//g, '/') : undefined;
+}
+
+/**
+ * 이미지 광고는 GetCreativeById 응답 variation 의 `['3']['2']` 에 `<img src="...simgad...">` HTML 이
+ * 직접 들어있다(미리보기 fetch 불필요). 첫 유효 img src 를 반환. (비디오·텍스트는 대신 `['1']['4']` 미리보기 URL)
+ */
+function imageFromVariations(variations: Json[]): string | undefined {
+  for (const v of variations) {
+    const inner = v?.['3'] as Json | undefined;
+    const html = typeof inner?.['2'] === 'string' ? (inner['2'] as string) : '';
+    const m = html.match(/src=["']([^"']+)["']/i);
+    if (m?.[1]) return m[1];
+  }
+  return undefined;
 }
 
 /** \xNN 16진 이스케이프 복원 */
@@ -192,15 +205,17 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     const previewUrl = ((variations[0]?.['1'] as Json | undefined)?.['4'] as string | undefined) ?? undefined;
 
     let videoUrl: string | undefined;
-    let imageUrl: string | undefined;
+    // 이미지 광고: 응답에 <img src> 직접 포함 → 미리보기 fetch 없이 추출
+    let imageUrl: string | undefined = imageFromVariations(variations);
     let landingUrl: string | undefined;
     let headline: string | undefined;
     if (previewUrl) {
+      // 비디오·텍스트 광고: 미리보기 content.js 를 받아 YouTube ID·랜딩·헤드라인 추출
       try {
         const html = await this.t.get(previewUrl);
         const ytId = extractYouTubeId(html);
         if (ytId) videoUrl = `https://www.youtube.com/embed/${ytId}`;
-        else imageUrl = extractImageUrl(html); // 비디오가 아니면 이미지 크리에이티브 시도(best-effort)
+        else if (!imageUrl) imageUrl = extractImageUrl(html); // 폴백
         landingUrl = extractLandingUrl(html); // visible_url → 랜딩. landing_domain 은 핸들러가 계산
         headline = fieldValue(html, 'headline') ?? fieldValue(html, 'body_text');
       } catch {
