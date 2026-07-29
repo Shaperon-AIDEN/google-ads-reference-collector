@@ -47,11 +47,9 @@ function extractLandingUrl(html) {
   }
   return undefined;
 }
-// 이미지 광고 크리에이티브 URL (best-effort) — Google 디스플레이 이미지는 /simgad/ 또는 googleusercontent/tpc
+// 이미지 광고 크리에이티브 URL (best-effort, 폴백) — /simgad/ 또는 googleusercontent 만 매칭(오탐 방지)
 function extractImageUrl(html) {
-  const m = html.match(
-    /https?:\\?\/\\?\/[^"'\\ )]*(?:\/simgad\/|googleusercontent\.com|tpc\.googlesyndication\.com)[^"'\\ )]*/i,
-  );
+  const m = html.match(/https?:\\?\/\\?\/[^"'\\ )]*(?:\/simgad\/|googleusercontent\.com\/)[^"'\\ )]*/i);
   return m ? m[0].replace(/\\\//g, '/') : undefined;
 }
 
@@ -109,17 +107,29 @@ async function listPage(advertiserId, region, num, pageToken) {
   return { items, next };
 }
 
+// 이미지 광고: 응답 variation 의 ['3']['2'] 에 <img src="...simgad..."> HTML 직접 포함 → 첫 img src 추출
+function imageFromVariations(variations) {
+  for (const v of variations) {
+    const html = v && v['3'] && typeof v['3']['2'] === 'string' ? v['3']['2'] : '';
+    const m = html.match(/src=["']([^"']+)["']/i);
+    if (m && m[1]) return m[1];
+  }
+  return undefined;
+}
+
 async function getDetail(advertiserId, creativeId) {
   const json = await rpc('LookupService/GetCreativeById', { 1: advertiserId, 2: creativeId, 5: { 1: 1, 2: 0, 3: 2410 } });
   const variations = (json['1'] && json['1']['5']) || [];
   const previewUrl = variations[0] && variations[0]['1'] && variations[0]['1']['4'];
-  let videoUrl, imageUrl, landingUrl, headline, youtubeVideoId;
+  // 이미지 광고는 응답에서 바로 추출(미리보기 fetch 불필요), 비디오·텍스트는 미리보기 content.js
+  let imageUrl = imageFromVariations(variations);
+  let videoUrl, landingUrl, headline, youtubeVideoId;
   if (previewUrl) {
     const r = await bg({ type: 'fetchText', url: previewUrl });
     if (r && r.ok && r.text) {
       youtubeVideoId = extractYouTubeId(r.text);
       if (youtubeVideoId) videoUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
-      else imageUrl = extractImageUrl(r.text); // 비디오가 아니면 이미지 크리에이티브(best-effort)
+      else if (!imageUrl) imageUrl = extractImageUrl(r.text); // 폴백
       landingUrl = extractLandingUrl(r.text);
     }
   }
