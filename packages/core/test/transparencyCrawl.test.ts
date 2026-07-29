@@ -89,6 +89,60 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.videoUrl).toBeUndefined();
   });
 
+  it('getAdDetail: 이미지 광고 — /archive/simgad/ 크리에이티브를 <img> 에서 추출(미리보기 fetch 불필요)', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': { '5': [{ '3': { '2': '<img src="https://tpc.googlesyndication.com/archive/simgad/123" width="696" height="450">' } }] },
+      }),
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get: vi.fn() });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_IMG' });
+    expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/archive/simgad/123');
+  });
+
+  it('getAdDetail: <img> 여러 개면 로고(/simgad/, archive없음) 건너뛰고 /archive/simgad/ 선택', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': {
+          '5': [
+            {
+              '3': {
+                '2':
+                  '<img src="https://tpc.googlesyndication.com/simgad/LOGO" width="2084" height="2084">' + // 대형 로고
+                  '<img src="https://tpc.googlesyndication.com/archive/simgad/AD" width="696" height="450">',
+              },
+            },
+          ],
+        },
+      }),
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get: vi.fn() });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_IMG' });
+    expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/archive/simgad/AD'); // 대형이어도 로고는 제외
+  });
+
+  it('getAdDetail: 로고(/simgad/ archive없음)만 있으면 크기 무관 imageUrl 없음', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': { '5': [{ '3': { '2': '<img src="https://tpc.googlesyndication.com/simgad/LOGO" width="2084" height="2084">' } }] },
+      }),
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get: vi.fn() });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_IMG' });
+    expect(detail.imageUrl).toBeUndefined();
+  });
+
+  it('getAdDetail: /pagead/ HTML 자산은 이미지로 오인하지 않음', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': { '5': [{ '3': { '2': '<img src="https://tpc.googlesyndication.com/pagead/gadgets/discover_ads.html" width="600" height="500">' } }] },
+      }),
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get: vi.fn() });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_HTML' });
+    expect(detail.imageUrl).toBeUndefined();
+  });
+
   it('도메인 검색은 미지원(예외)', async () => {
     const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(), get: vi.fn() });
     await expect(src.searchAdvertisersByDomain({ domain: 'x.com' })).rejects.toThrow(/회사명 검색/);

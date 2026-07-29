@@ -119,14 +119,21 @@ async function listPage(advertiserId, region, num, pageToken) {
   return { items, next };
 }
 
-// 이미지 광고: 응답 variation 의 ['3']['2'] 에 <img src="...simgad..."> HTML 직접 포함 → 첫 img src 추출.
-// ⚠️ <img> 태그의 src 만, 그리고 실제 이미지 호스트(simgad/googleusercontent)만 — discover/HTML 광고의
-//    <iframe>/<script> src(discover_ads.html·load_preloaded_resource.js)를 이미지로 오인하지 않도록.
+// 이미지 광고: 응답 variation 의 ['3']['2'] 에 <img src="...simgad..."> HTML 직접 포함.
+// ⚠️ 실제 광고 크리에이티브는 **/archive/simgad/** 경로다. archive 없는 /simgad/ 는 광고주 **로고**이고
+//    (크기 무관 — 2084x2084 대형 로고도 존재), /pagead/ 는 HTML 자산. 둘 다 제외해야 로고 오수집을 막는다.
+function isRealCreativeUrl(u) {
+  return /\/archive\/simgad\/|googleusercontent\.com\//.test(u) && !/\/pagead\//.test(u);
+}
 function imageFromVariations(variations) {
   for (const v of variations) {
     const html = v && v['3'] && typeof v['3']['2'] === 'string' ? v['3']['2'] : '';
-    const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-    if (m && m[1] && /\/simgad\/|googleusercontent\.com\//.test(m[1])) return m[1];
+    const re = /<img\b[^>]*>/gi;
+    let tag;
+    while ((tag = re.exec(html))) {
+      const src = (tag[0].match(/src=["']([^"']+)["']/i) || [])[1];
+      if (src && isRealCreativeUrl(src)) return src; // 첫 실제 크리에이티브
+    }
   }
   return undefined;
 }
