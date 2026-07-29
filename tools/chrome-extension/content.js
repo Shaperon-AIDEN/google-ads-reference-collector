@@ -70,17 +70,27 @@ function jitter(base) {
 // 요구하며 400 을 반환한다. 투명성 센터는 공개 데이터라 curl 처럼 익명 호출해야 정상 동작한다.
 // (실제 브라우저의 TLS 지문·IP·Origin/Referer 이점은 쿠키와 무관하게 유지 → /sorry 회피는 그대로)
 async function rpc(path, reqObj) {
-  const res = await fetch(`${RPC_BASE}/${path}?authuser=0`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-    body: 'f.req=' + encodeURIComponent(JSON.stringify(reqObj)),
-    credentials: 'omit',
-  });
+  let res;
+  try {
+    res = await fetch(`${RPC_BASE}/${path}?authuser=0`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: 'f.req=' + encodeURIComponent(JSON.stringify(reqObj)),
+      credentials: 'omit',
+      // redirect:'manual' — 차단 시 /sorry(다른 오리진)로 302 되는데, 이를 따라가면 CORS 로
+      // "Failed to fetch" 가 난다. manual 이면 opaqueredirect(status 0) 로 받아 차단 감지 가능.
+      redirect: 'manual',
+    });
+  } catch {
+    // fetch 자체 실패(Failed to fetch) = 네트워크 오류 또는 차단 리다이렉트
+    throw new Error('BLOCKED');
+  }
+  // opaqueredirect(status 0/type opaqueredirect) 또는 302 = /sorry 봇 차단
+  if (res.type === 'opaqueredirect' || res.status === 0 || res.status === 302) throw new Error('BLOCKED');
   const text = await res.text();
   const t = text.trimStart();
-  // HTML/리다이렉트 = /sorry 봇 차단
-  if (t.startsWith('<') || res.status === 302) throw new Error('BLOCKED');
-  if (!res.ok) throw new Error(`RPC ${res.status}: ${t.slice(0, 80)}`); // 본문 앞부분으로 원인 파악
+  if (t.startsWith('<')) throw new Error('BLOCKED'); // HTML = 차단 페이지
+  if (!res.ok) throw new Error(`RPC ${res.status}: ${t.slice(0, 80)}`);
   // Google 은 JSON 하이재킹 방지로 )]}' 접두어를 붙일 수 있음 → 정상 응답
   return JSON.parse(t.replace(/^\)\]\}'\s*/, ''));
 }
@@ -217,9 +227,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       try {
         results.push(await collectAdvertiser(advertiserId, msg.cfg));
       } catch (e) {
-        report({ phase: 'error', advertiserId, message: String(e && e.message) });
-        results.push({ advertiserId, error: String(e && e.message) });
-        if (String(e && e.message) === 'BLOCKED') break; // 차단 시 전체 중단
+        const blocked = String(e && e.message) === 'BLOCKED';
+        const msgText = blocked
+          ? '⚠️ Google 봇 차단(/sorry) — IP 가 일시 차단됨. 잠시 후(수십 분) 재시도하거나 요청 간격을 늘리세요. 전체 중단.'
+          : String(e && e.message);
+        report({ phase: blocked ? 'blocked' : 'error', advertiserId, message: msgText });
+        results.push({ advertiserId, error: msgText });
+        if (blocked) break; // 차단 시 전체 중단
       }
       await sleep(jitter(msg.cfg.delayMs));
     }
