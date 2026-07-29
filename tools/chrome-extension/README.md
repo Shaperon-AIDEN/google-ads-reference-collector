@@ -47,7 +47,8 @@ pnpm dev:functions   # 기본 http://localhost:7071
 
 ## 제한 / 주의
 
-- RPC 는 **쿠키 없이(익명)** 호출한다(`credentials: 'omit'`). 로그인 쿠키를 보내면 anji 엔드포인트가 인증 요청으로 간주해 SAPISIDHASH 헤더를 요구하며 **400** 을 반환한다(투명성 센터는 공개 데이터라 익명 호출이 정석). 익명이어도 실제 브라우저의 IP·TLS·Origin 이점은 유지되어 `/sorry` 회피는 그대로.
+- **🔴 반드시 Google 에서 로그아웃한 브라우저/프로필에서 사용.** RPC 는 `credentials: 'include'` 로 호출한다 — CAPTCHA 를 풀면 받는 면제 쿠키(GOOGLE_ABUSE_EXEMPTION)를 함께 보내 `/sorry` 차단을 우회하기 위함. 단 **로그인 상태면** SAPISID 쿠키가 실려 anji 엔드포인트가 SAPISIDHASH 헤더를 요구하며 **400** 을 반환한다(content script 는 httpOnly SAPISID 를 못 읽어 해시 생성 불가). → 게스트/시크릿 창 또는 Google 로그아웃 프로필에서 실행. (로그인 상태로 실행하면 "RPC 400: 로그아웃 필요" 안내가 뜬다.)
+- **차단 해제:** 그 IP 의 브라우저에서 adstransparency.google.com 접속 → CAPTCHA 를 풀면 면제 쿠키가 발급돼 확장이 다시 동작(쿠키 전송하므로). 그래도 대량이면 재차단되니 간격을 넉넉히.
 - 비공식 내부 RPC 기반 — Google이 형식을 바꾸면 조용히 깨질 수 있다(파싱 로직은 `packages/core`의 크롤 어댑터와 동일).
 - **비디오 광고만** 저장(프로젝트 스코프). 이미지/텍스트는 건너뜀.
 - 실제 브라우저라도 과도하게 빠르면 차단될 수 있으니 간격을 넉넉히.
