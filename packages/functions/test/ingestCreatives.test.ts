@@ -58,7 +58,7 @@ describe('ingestCreatives', () => {
     });
 
     expect(result.status).toBe('success');
-    expect(result.savedVideo).toBe(1);
+    expect(result.saved).toBe(1);
     expect(result.snapshots).toBe(1);
     expect(repos.upserts).toHaveLength(1);
     expect(repos.upserts[0]!.youtubeVideoId).toBe('dQw4w9WgXcQ');
@@ -67,9 +67,9 @@ describe('ingestCreatives', () => {
     expect(repos.snapshots[0]).toMatchObject({ adId: 'ad-1', ytViewCount: 100n, ytLikeCount: 5 });
   });
 
-  it('비디오가 아닌 광고는 건너뜀', async () => {
+  it('기본 스코프(video)에서는 비디오가 아닌 광고를 건너뜀', async () => {
     const repos = ingestRepos({ id: 'c1', name: '드래프터' });
-    const deps = makeDeps({ repos: repos as never, youtube: new FakeYouTube([]) });
+    const deps = makeDeps({ repos: repos as never, youtube: new FakeYouTube([]), env: { COLLECT_FORMATS: 'video' } as never });
 
     const result = await ingestCreatives(deps, {
       advertiserId: 'AR1',
@@ -79,9 +79,31 @@ describe('ingestCreatives', () => {
       ],
     });
 
-    expect(result.savedVideo).toBe(0);
-    expect(result.skippedNonVideo).toBe(2);
+    expect(result.saved).toBe(0);
+    expect(result.skipped).toBe(2);
     expect(repos.upserts).toHaveLength(0);
+  });
+
+  it('스코프 all 이면 이미지/텍스트도 저장(이미지 URL·헤드라인 포함)', async () => {
+    const repos = ingestRepos({ id: 'c1', name: '드래프터' });
+    const deps = makeDeps({ repos: repos as never, youtube: new FakeYouTube([]), env: { COLLECT_FORMATS: 'all' } as never });
+
+    const result = await ingestCreatives(deps, {
+      advertiserId: 'AR1',
+      ads: [
+        { creativeId: 'CR_img', format: 'image', imageUrl: 'https://img/simgad/1', headline: '헤드라인', landingUrl: 'https://shop.example.com/x' },
+        { creativeId: 'CR_txt', format: 'text', headline: '텍스트 광고 문구' },
+      ],
+    });
+
+    expect(result.saved).toBe(2);
+    expect(result.skipped).toBe(0);
+    expect(result.snapshots).toBe(0); // 비-비디오는 조회수 없음
+    expect(repos.upserts.map((u) => u.format).sort()).toEqual(['image', 'text']);
+    const img = repos.upserts.find((u) => u.creativeId === 'CR_img')!;
+    expect(img.imageUrl).toBe('https://img/simgad/1');
+    expect(img.headline).toBe('헤드라인');
+    expect(img.landingDomain).toBe('shop.example.com');
   });
 
   it('YouTube 통계가 없으면 저장은 하되 스냅샷은 없음', async () => {
@@ -93,7 +115,7 @@ describe('ingestCreatives', () => {
       ads: [{ creativeId: 'CR1', format: 'video', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ' }],
     });
 
-    expect(result.savedVideo).toBe(1);
+    expect(result.saved).toBe(1);
     expect(result.snapshots).toBe(0);
     expect(repos.upserts[0]!.youtubeVideoId).toBe('dQw4w9WgXcQ');
   });

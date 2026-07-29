@@ -1,4 +1,4 @@
-import { landingDomain, parseYouTubeId } from '@adref/core';
+import { isFormatAllowed, landingDomain, parseYouTubeId, type AdFormat } from '@adref/core';
 import type { HandlerDeps } from './context.js';
 
 /** Chrome 확장이 실제 브라우저에서 수집해 보낸 크리에이티브 1건 */
@@ -10,6 +10,8 @@ export interface IngestAd {
   daysShown?: number | null;
   videoUrl?: string; // youtube embed/watch URL (있으면 여기서 video id 파싱)
   youtubeVideoId?: string; // 확장이 직접 파싱해 보낼 수도 있음
+  imageUrl?: string; // 이미지 광고 크리에이티브 URL
+  headline?: string; // 광고 문구
   landingUrl?: string;
   raw?: unknown;
 }
@@ -23,9 +25,14 @@ export interface IngestResult {
   status: 'success' | 'partial' | 'failed';
   competitor: string;
   received: number;
-  savedVideo: number;
-  skippedNonVideo: number;
-  snapshots: number;
+  saved: number; // 저장된 광고 수(스코프 통과)
+  skipped: number; // 스코프 밖이라 건너뛴 수(COLLECT_FORMATS=video 일 때 비디오 아님)
+  snapshots: number; // YouTube 조회수 스냅샷 수
+}
+
+const VALID_FORMATS = new Set<AdFormat>(['video', 'image', 'text']);
+function normalizeFormat(f: string): AdFormat {
+  return VALID_FORMATS.has(f as AdFormat) ? (f as AdFormat) : 'text';
 }
 
 /** first/last 게재일로 총 게재일수 계산 (양끝 포함) */
@@ -44,22 +51,23 @@ function daysBetween(first?: string, last?: string): number | null {
  * 스코프: 비디오 광고만 저장(이미지/텍스트는 건너뜀).
  */
 export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload): Promise<IngestResult> {
-  const { repos, youtube } = deps;
+  const { repos, youtube, env } = deps;
   const run = await repos.runs.start('detail');
 
-  let savedVideo = 0;
-  let skippedNonVideo = 0;
+  let saved = 0;
+  let skipped = 0;
   let snapshots = 0;
 
   try {
     const competitor = await repos.competitors.findByAdvertiserId(payload.advertiserId);
     if (!competitor) throw new Error(`등록된 경쟁사를 찾을 수 없습니다 (advertiser_id=${payload.advertiserId})`);
 
-    const videos = payload.ads.filter((a) => a.format === 'video');
-    skippedNonVideo = payload.ads.length - videos.length;
+    // 스코프: COLLECT_FORMATS 에 따라 비디오만(기본) 또는 전체(all)
+    const scoped = payload.ads.filter((a) => isFormatAllowed(normalizeFormat(a.format), env.COLLECT_FORMATS));
+    skipped = payload.ads.length - scoped.length;
 
-    // 각 광고의 YouTube video id 확정 (payload 우선, 없으면 videoUrl 에서 파싱)
-    const withVid = videos.map((a) => ({
+    // 각 광고의 YouTube video id 확정 (payload 우선, 없으면 videoUrl 에서 파싱). 비-비디오는 없음.
+    const withVid = scoped.map((a) => ({
       ad: a,
       youtubeVideoId: a.youtubeVideoId ?? parseYouTubeId(a.videoUrl) ?? undefined,
     }));
@@ -81,10 +89,10 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
       if (!ad.creativeId) continue;
       const stats = youtubeVideoId ? statsByVid.get(youtubeVideoId) : undefined;
 
-      const saved = await repos.ads.upsertByCreativeId({
+      const savedAd = await repos.ads.upsertByCreativeId({
         competitorId: competitor.id,
         creativeId: ad.creativeId,
-        format: 'video',
+        format: normalizeFormat(ad.format),
         platforms: [],
         firstShown: ad.firstShown ?? null,
         lastShown: ad.lastShown ?? null,
@@ -92,6 +100,8 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
         videoUrl: ad.videoUrl ?? (youtubeVideoId ? `https://www.youtube.com/embed/${youtubeVideoId}` : null),
         youtubeVideoId: youtubeVideoId ?? null,
         publishedAt: stats?.publishedAt ? new Date(stats.publishedAt) : null,
+        imageUrl: ad.imageUrl ?? null,
+        headline: ad.headline ?? null,
         thumbnailPath: null, // 대시보드는 youtube_video_id 로 썸네일 URL 유도 (Blob 불필요)
         landingUrl: ad.landingUrl ?? null,
         landingDomain: landingDomain(ad.landingUrl),
@@ -100,10 +110,10 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
         collectedAt: new Date(),
       });
 
-      savedVideo += 1;
+      saved += 1;
       if (stats) {
         await repos.adMetrics.insertSnapshot({
-          adId: saved.id,
+          adId: savedAd.id,
           snapshotDate,
           ytViewCount: stats.viewCount,
           ytLikeCount: stats.likeCount,
@@ -112,13 +122,13 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
       }
     }
 
-    await repos.runs.finish(run.id, { status: 'success', newAdsCount: savedVideo, apiCallCount: 0 });
+    await repos.runs.finish(run.id, { status: 'success', newAdsCount: saved, apiCallCount: 0 });
     return {
       status: 'success',
       competitor: competitor.name,
       received: payload.ads.length,
-      savedVideo,
-      skippedNonVideo,
+      saved,
+      skipped,
       snapshots,
     };
   } catch (err) {

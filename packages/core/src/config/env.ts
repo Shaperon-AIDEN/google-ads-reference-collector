@@ -12,6 +12,10 @@ const envSchema = z.object({
 
   // 외부 데이터 소스 — serpapi(안정, 유료) / crawl(무료, 비공식·실험적). 롤백은 이 값만 변경.
   ADS_SOURCE: z.enum(['serpapi', 'crawl']).default('serpapi'),
+
+  // 수집·표시 스코프 — 'video'(기본, 원래 동작=비디오만) / 'all'(텍스트·이미지 포함).
+  // 비디오 전용으로 되돌리려면 이 값만 'video' 로 바꾸면 됨(수집기·대시보드 공통).
+  COLLECT_FORMATS: z.enum(['video', 'all']).default('video'),
   SERPAPI_KEY: z.string().optional(),
   YOUTUBE_API_KEY: z.string().optional(),
 

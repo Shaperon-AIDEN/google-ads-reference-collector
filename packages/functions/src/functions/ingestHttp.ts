@@ -31,7 +31,7 @@ export async function ingestHttp(req: HttpRequest, context: InvocationContext): 
   try {
     const result = await ingestCreatives(deps, body);
     context.log(
-      `[ingest] ${result.competitor}: 수신 ${result.received}, 비디오 저장 ${result.savedVideo}, 스냅샷 ${result.snapshots}`,
+      `[ingest] ${result.competitor}: 수신 ${result.received}, 저장 ${result.saved}, 건너뜀 ${result.skipped}, 스냅샷 ${result.snapshots}`,
     );
     return { status: 200, headers: CORS, jsonBody: result };
   } catch (err) {

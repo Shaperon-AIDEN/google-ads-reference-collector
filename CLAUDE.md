@@ -56,8 +56,9 @@
 
 ## 수집 스코프 (중요)
 
-- **비디오 광고만 수집한다.** 이미지·텍스트 광고는 대상이 아니다 — 목록 수집 단계에서 `format === 'video'` 만 신규 감지·큐 적재·저장한다.
-- 대시보드 영상 재생은 **YouTube 영상만** 지원(임베드). 비-YouTube 영상(googlevideo 스트림 URL)은 만료되므로 재생 대신 원본 링크(투명성 센터)만 제공한다.
+- **수집·표시 스코프는 `COLLECT_FORMATS` env 로 제어한다** — `video`(기본, 비디오만) / `all`(텍스트·이미지 포함). 되돌리려면 이 값만 `video` 로 바꾸면 됨(수집기·대시보드 공통, 코드 변경 없음). `isFormatAllowed(format, scope)` 헬퍼가 목록 수집 단계에서 신규 감지·저장을 필터한다.
+- **조회수·좋아요·클릭수는 텍스트/이미지 광고에 없다.** 투명성 센터(크롤·SerpApi)는 상업 광고의 조회/클릭/노출/비용을 공개하지 않는다(정치·선거 광고만 노출·비용 range 제공). 비디오 조회수·좋아요는 YouTube 영상 ID 로 YouTube API 를 교차조회해 얻는 것이라 텍스트/이미지엔 해당 없음. 텍스트/이미지에서 확보 가능한 추가 메타데이터는 `image_url`(이미지 크리에이티브 URL)·`headline`(문구)·랜딩 URL·게재기간뿐.
+- 대시보드: 비디오는 **YouTube 임베드**(비-YouTube 영상은 만료되므로 투명성 센터 링크), 이미지는 `image_url` 표시, 텍스트는 `headline` 표시. 목록의 "조회수 없는 항목 숨김"은 스코프 `all`일 때 **비디오에만** 적용(텍스트/이미지는 원래 조회수가 없으므로 항상 표시).
 - 영상 원본 파일은 저장하지 않는다 (URL 만 확보).
 
 ## 규칙
@@ -83,7 +84,7 @@
 
 - **동기:** 서버(로컬·DGX 등 데이터센터 IP)로 직접 크롤하면 Google `/sorry`(비정상 트래픽 차단)에 막힌다. **실제 사용자 브라우저의 first-party 요청은 차단을 회피**하므로, Chrome 확장이 투명성 센터에서 수집해 백엔드로 전송한다. (Playwright 헤드리스는 탐지되므로 사용 안 함)
 - 확장(`tools/chrome-extension/`): content script 가 adstransparency.google.com 페이지 컨텍스트에서 `SearchCreatives`·`GetCreativeById` 를 **same-origin** 호출(파싱은 `transparencyCrawl.ts` 와 동일), 미리보기 content.js·백엔드 POST 는 background 서비스워커가 대행(CORS 회피). 이미 저장된 것은 `/api/known` 으로 걸러 **신규만 상세 요청**.
-- 백엔드 엔드포인트(`packages/functions/src/functions/ingestHttp.ts`, CORS 허용): `POST /api/ingest`(저장), `POST /api/known`(기존 creative_id), `GET /api/advertisers`(경쟁사 목록). 저장 핸들러 `ingestCreatives` 는 collectAdDetail 의 저장 계층 재사용 — creative_id 멱등 upsert + YouTube 조회수/좋아요/게시일 스냅샷(서버 측, 무료). **비디오만** 저장.
+- 백엔드 엔드포인트(`packages/functions/src/functions/ingestHttp.ts`, CORS 허용): `POST /api/ingest`(저장), `POST /api/known`(기존 creative_id), `GET /api/advertisers`(경쟁사 목록). 저장 핸들러 `ingestCreatives` 는 collectAdDetail 의 저장 계층 재사용 — creative_id 멱등 upsert + (비디오면)YouTube 조회수/좋아요/게시일 스냅샷(서버 측, 무료). 저장 스코프는 `COLLECT_FORMATS` 따름(확장은 전체 전송, 백엔드가 필터).
 - 사용법·설치는 `tools/chrome-extension/README.md`. 요청 간격(delay)·차단 감지 자동 중단 내장.
 
 ## 데이터 소스 스위칭 (SerpApi ↔ 크롤)

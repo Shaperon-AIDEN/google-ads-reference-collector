@@ -31,6 +31,8 @@ export class AdRepository {
           platforms: input.platforms,
           videoUrl: input.videoUrl,
           youtubeVideoId: input.youtubeVideoId,
+          imageUrl: input.imageUrl,
+          headline: input.headline,
           thumbnailPath: input.thumbnailPath,
           landingUrl: input.landingUrl,
           landingDomain: input.landingDomain,
