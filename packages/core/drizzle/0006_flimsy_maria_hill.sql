@@ -1,0 +1,1 @@
+ALTER TABLE "ad_variations" DROP COLUMN IF EXISTS "screenshot";

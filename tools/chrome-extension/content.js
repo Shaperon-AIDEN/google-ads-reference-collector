@@ -408,63 +408,6 @@ async function collectAdvertiser(advertiserId, cfg) {
   };
 }
 
-// ===== 스크린샷용 대안 iframe 측정 (background 의 captureVisibleTab 이 크롭할 좌표 제공) =====
-// 광고 상세 페이지의 대안 카드는 각각 fletch-render iframe: id 에 `_preview_c…_v<N>_<w>_<h>_` 포함.
-function variationIframes() {
-  const list = [...document.querySelectorAll('iframe[id*="_preview_"]')]
-    .map((el) => {
-      const m = el.id.match(/_v(\d+)_(\d+)_(\d+)_/);
-      return { el, idx: m ? Number(m[1]) : 0, width: m ? Number(m[2]) : 0, height: m ? Number(m[3]) : 0 };
-    })
-    .sort((a, b) => a.idx - b.idx);
-  return list;
-}
-
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === 'waitVariations') {
-    (async () => {
-      // iframe 이 나타날 때까지 대기(최대 20초)
-      let found = 0;
-      for (let i = 0; i < 40; i++) {
-        found = variationIframes().length;
-        if (found > 0) break;
-        await sleep(500);
-      }
-      if (found === 0) return sendResponse({ ok: false, error: '대안 iframe 을 찾지 못함' });
-      // ⚠️ 대안 카드는 뷰포트에 들어와야 렌더를 시작한다(지연 렌더) — 화면 밖 대안을 바로
-      // 찍으면 빈 영역이 캡처된다. 전체 대안을 한 번씩 스크롤해 렌더를 트리거(프리워밍)한 뒤
-      // 렌더 완료(실측 ~6초)를 기다린다.
-      for (const v of variationIframes()) {
-        v.el.scrollIntoView({ block: 'center', behavior: 'instant' });
-        await sleep(400);
-      }
-      await sleep(msg.renderWaitMs || 6000);
-      sendResponse({ ok: true, count: variationIframes().length });
-    })();
-    return true;
-  }
-  if (msg?.type === 'focusVariation') {
-    (async () => {
-      const list = variationIframes();
-      const v = list[msg.pos];
-      if (!v) return sendResponse({ ok: false });
-      v.el.scrollIntoView({ block: 'center', behavior: 'instant' });
-      await sleep(800); // 스크롤 정착 + 재합성 대기
-      const r = v.el.getBoundingClientRect();
-      sendResponse({
-        ok: true,
-        idx: v.idx,
-        width: v.width || Math.round(r.width),
-        height: v.height || Math.round(r.height),
-        rect: { x: r.x, y: r.y, w: r.width, h: r.height },
-        dpr: window.devicePixelRatio || 1,
-      });
-    })();
-    return true;
-  }
-  return false;
-});
-
 // popup → content 명령 수신
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type !== 'collect') return false;
