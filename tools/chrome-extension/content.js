@@ -423,7 +423,7 @@ function variationIframes() {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === 'waitVariations') {
     (async () => {
-      // iframe 이 나타날 때까지 대기(최대 20초) 후, 광고 렌더 완료 대기(실측 ~6초)
+      // iframe 이 나타날 때까지 대기(최대 20초)
       let found = 0;
       for (let i = 0; i < 40; i++) {
         found = variationIframes().length;
@@ -431,6 +431,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         await sleep(500);
       }
       if (found === 0) return sendResponse({ ok: false, error: '대안 iframe 을 찾지 못함' });
+      // ⚠️ 대안 카드는 뷰포트에 들어와야 렌더를 시작한다(지연 렌더) — 화면 밖 대안을 바로
+      // 찍으면 빈 영역이 캡처된다. 전체 대안을 한 번씩 스크롤해 렌더를 트리거(프리워밍)한 뒤
+      // 렌더 완료(실측 ~6초)를 기다린다.
+      for (const v of variationIframes()) {
+        v.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+        await sleep(400);
+      }
       await sleep(msg.renderWaitMs || 6000);
       sendResponse({ ok: true, count: variationIframes().length });
     })();
@@ -442,7 +449,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const v = list[msg.pos];
       if (!v) return sendResponse({ ok: false });
       v.el.scrollIntoView({ block: 'center', behavior: 'instant' });
-      await sleep(300);
+      await sleep(800); // 스크롤 정착 + 재합성 대기
       const r = v.el.getBoundingClientRect();
       sendResponse({
         ok: true,
