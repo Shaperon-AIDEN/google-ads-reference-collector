@@ -79,6 +79,30 @@ function componentsFromHtmlTemplate(rawHtml) {
   }
   return out;
 }
+// content.js 세 번째 템플릿(실측): "Single Ad Rendering Service"(검색형 텍스트 광고).
+// AF_dataServiceRequests 의 "361903925" 배열 [ …null×7, headline, visibleUrl, description, … ].
+// 크리에이티브 이미지는 원래 없는 유형(내장 data:image 는 별점 등 UI 아이콘).
+function componentsFromSearchAdTemplate(rawHtml) {
+  const d = unescapeHex(rawHtml);
+  const m = d.match(/"361903925":\[(?:[^,"[\]]*,){7}"((?:[^"\\]|\\.)*)","((?:[^"\\]|\\.)*)","((?:[^"\\]|\\.)*)"/);
+  if (!m) return {};
+  const dec = (s) => {
+    try {
+      return JSON.parse('"' + s + '"');
+    } catch {
+      return s;
+    }
+  };
+  const out = {};
+  const headline = dec(m[1]).trim();
+  const visible = dec(m[2]).trim();
+  const description = dec(m[3]).trim();
+  if (headline) out.headline = headline;
+  if (description) out.description = description;
+  if (/^https?:\/\//i.test(visible)) out.landingUrl = visible;
+  else if (/^[a-z0-9.-]+\.[a-z]{2,}/i.test(visible)) out.landingUrl = 'https://' + visible;
+  return out;
+}
 function extractLandingUrl(html) {
   const dest = fieldValue(html, 'destination_url');
   if (dest && /^https?:\/\//i.test(dest)) return dest;
@@ -290,16 +314,17 @@ async function getDetail(advertiserId, creativeId, format) {
       youtubeVideoId = extractYouTubeId(r.text);
       if (youtubeVideoId) videoUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
     }
-    // 대안별 구성요소 — adData JSON 우선, 없으면 HTML 마크업 템플릿 파서
+    // 대안별 구성요소 — adData JSON → HTML 마크업 템플릿 → 검색형(Single Ad) 템플릿 순 폴백
     const t = componentsFromHtmlTemplate(r.text);
+    const s = componentsFromSearchAdTemplate(r.text);
     const v = {
       idx,
-      headline: fieldValue(r.text, 'headline') || fieldValue(r.text, 'longHeadline') || t.headline,
-      description: fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text') || t.description,
+      headline: fieldValue(r.text, 'headline') || fieldValue(r.text, 'longHeadline') || t.headline || s.headline,
+      description: fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text') || t.description || s.description,
       ctaText: fieldValue(r.text, 'callToActionText') || t.ctaText,
       logoUrl: extractLogo(r.text) || t.logoUrl,
       imageUrl: t.imageUrl,
-      landingUrl: extractLandingUrl(r.text) || t.landingUrl,
+      landingUrl: extractLandingUrl(r.text) || t.landingUrl || s.landingUrl,
     };
     const size = r.text.match(/"width"\s*:\s*(\d+)\s*,\s*"height"\s*:\s*(\d+)/);
     if (size) {
