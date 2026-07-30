@@ -192,7 +192,7 @@ export async function bestAds(period: BestPeriod, minViews = 0, from?: string, t
   }));
 }
 
-/** 광고 "대안"(variation) — 대안별 사이즈·문구·스크린샷 유무 */
+/** 광고 "대안"(variation) — 대안별 사이즈·문구 */
 export interface AdVariationView {
   id: string;
   idx: number;
@@ -204,10 +204,9 @@ export interface AdVariationView {
   logoUrl: string | null;
   imageUrl: string | null;
   landingUrl: string | null;
-  hasScreenshot: boolean;
 }
 
-/** 광고의 대안 목록 (스크린샷 바이너리는 제외 — /api/variations/[id]/screenshot 로 스트리밍) */
+/** 광고의 대안 목록 */
 export async function getAdVariations(adId: string): Promise<AdVariationView[]> {
   const v = schema.adVariations;
   const rows = await db()
@@ -222,7 +221,6 @@ export async function getAdVariations(adId: string): Promise<AdVariationView[]> 
       logoUrl: v.logoUrl,
       imageUrl: v.imageUrl,
       landingUrl: v.landingUrl,
-      hasScreenshot: sql<boolean>`(${v.screenshot} is not null)`,
     })
     .from(v)
     .where(eq(v.adId, adId))

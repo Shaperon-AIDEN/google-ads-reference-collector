@@ -1,7 +1,6 @@
 import {
   bigint,
   boolean,
-  customType,
   date,
   integer,
   jsonb,
@@ -63,7 +62,6 @@ export const ads = pgTable('ads', {
 
 // 5.2b ad_variations — 광고 "대안" (투명성 센터 상세의 variation 카드)
 // 한 광고에 여러 대안이 있고 대안마다 사이즈·문구·CTA 가 다르다. 전부 보존한다.
-// screenshot 은 확장이 투명성 센터 렌더링을 캡처한 PNG (원본 픽셀 그대로 — 비율·레이아웃 재현).
 export const adVariations = pgTable(
   'ad_variations',
   {
@@ -80,9 +78,6 @@ export const adVariations = pgTable(
     logoUrl: text('logo_url'),
     imageUrl: text('image_url'),
     landingUrl: text('landing_url'),
-    screenshot: customType<{ data: Buffer; driverData: Buffer }>({
-      dataType: () => 'bytea',
-    })('screenshot'),
     collectedAt: timestamp('collected_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

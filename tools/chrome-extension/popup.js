@@ -83,15 +83,6 @@ $('start').addEventListener('click', async () => {
   });
 });
 
-// 스크린샷 수집 — background 가 광고 페이지를 하나씩 열어 대안별 캡처 (팝업이 닫혀도 진행)
-$('screenshots').addEventListener('click', () => {
-  const cfg = readCfg();
-  chrome.runtime.sendMessage({ type: 'screenshotRun', cfg }, (res) => {
-    if (chrome.runtime.lastError) return log('오류: ' + chrome.runtime.lastError.message);
-    if (res && res.started) log('스크린샷 수집 시작 — 탭이 자동으로 열리고 닫힙니다. 캡처 중 창을 화면에 두세요.');
-  });
-});
-
 // 진행 상황 수신
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type !== 'progress') return;

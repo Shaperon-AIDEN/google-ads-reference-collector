@@ -69,53 +69,43 @@ function DailyGrowthChart({
   );
 }
 
-/** 대안 1건 렌더 — 스크린샷 있으면 원본 픽셀 그대로, 없으면 실제 광고 단위 크기의 흰 카드로 조합 */
+/** 대안 1건 렌더 — 실제 광고 단위 크기의 흰 카드로 조합 (대안마다 사이즈·문구가 다르다) */
 function VariationCard({ v }: { v: AdVariationView }) {
   const w = v.width && v.width > 0 ? Math.min(v.width, 480) : 300;
   const label = `대안 ${v.idx + 1}${v.width && v.height ? ` · ${v.width}×${v.height}` : ''}`;
   return (
     <div style={{ flexShrink: 0 }}>
       <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>{label}</div>
-      {v.hasScreenshot ? (
-        // 투명성 센터 렌더링 캡처 — 비율·레이아웃 원본 그대로
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`/api/variations/${v.id}/screenshot`}
-          alt={v.headline ?? label}
-          style={{ width: w, display: 'block', borderRadius: 10, border: '1px solid var(--border)' }}
-        />
-      ) : (
-        <div
-          style={{
-            width: w,
-            background: '#fff',
-            color: '#202124',
-            borderRadius: 10,
-            overflow: 'hidden',
-            border: '1px solid var(--border)',
-          }}
-        >
-          {v.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={v.imageUrl} alt="" style={{ display: 'block', width: '100%' }} />
-          )}
-          {(v.headline || v.description || v.ctaText) && (
-            <div style={{ padding: '14px 14px 10px' }}>
-              {v.logoUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={v.logoUrl} alt="" style={{ display: 'block', maxHeight: 24, maxWidth: 120, marginBottom: 10 }} />
-              )}
-              {v.headline && <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.3, marginBottom: 8 }}>{v.headline}</div>}
-              {v.description && <div style={{ fontSize: 13, lineHeight: 1.45, color: '#5f6368' }}>{v.description}</div>}
-              {v.ctaText && (
-                <div style={{ borderTop: '1px solid #e8eaed', marginTop: 12, paddingTop: 8, textAlign: 'right', fontWeight: 600, fontSize: 13 }}>
-                  {v.ctaText} <span aria-hidden>›</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      <div
+        style={{
+          width: w,
+          background: '#fff',
+          color: '#202124',
+          borderRadius: 10,
+          overflow: 'hidden',
+          border: '1px solid var(--border)',
+        }}
+      >
+        {v.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={v.imageUrl} alt="" style={{ display: 'block', width: '100%' }} />
+        )}
+        {(v.headline || v.description || v.ctaText) && (
+          <div style={{ padding: '14px 14px 10px' }}>
+            {v.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={v.logoUrl} alt="" style={{ display: 'block', maxHeight: 24, maxWidth: 120, marginBottom: 10 }} />
+            )}
+            {v.headline && <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.3, marginBottom: 8 }}>{v.headline}</div>}
+            {v.description && <div style={{ fontSize: 13, lineHeight: 1.45, color: '#5f6368' }}>{v.description}</div>}
+            {v.ctaText && (
+              <div style={{ borderTop: '1px solid #e8eaed', marginTop: 12, paddingTop: 8, textAlign: 'right', fontWeight: 600, fontSize: 13 }}>
+                {v.ctaText} <span aria-hidden>›</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -151,89 +141,8 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
       </div>
       <h1>{ad.competitorName} <span className={`badge ${ad.format}`}>{ad.format}</span></h1>
 
-      {/* 광고 미리보기.
-          - 구성요소(문구·CTA·로고)가 있으면: 원본 광고 단위처럼 **흰 배경 광고 카드**로 재현
-            (실제 광고는 흰 바탕 세로형 카드 — 대시보드 다크 테마를 물려받으면 안 됨).
-          - 없으면: 배너/영상만 원래 크기 그대로 크게 표시. */}
-      {ad.headline || ad.description || ad.ctaText ? (
-        <div className="row" style={{ alignItems: 'flex-start', gap: 24 }}>
-          {/* 원본 재현 광고 카드 — 흰 배경·고정 톤(다크 테마 무관) */}
-          <div
-            style={{
-              width: 340,
-              flexShrink: 0,
-              background: '#fff',
-              color: '#202124',
-              borderRadius: 14,
-              overflow: 'hidden',
-              border: '1px solid var(--border)',
-            }}
-          >
-            {ad.youtubeVideoId ? (
-              <div style={{ position: 'relative', paddingTop: '56.25%' }}>
-                <iframe
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
-                  src={`https://www.youtube.com/embed/${ad.youtubeVideoId}`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            ) : ad.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={ad.imageUrl} alt={ad.headline ?? ad.creativeId} style={{ display: 'block', width: '100%' }} />
-            ) : null}
-            <div style={{ padding: '22px 20px 14px' }}>
-              {ad.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={ad.logoUrl} alt="브랜드 로고" style={{ display: 'block', maxHeight: 32, maxWidth: 160, marginBottom: 16 }} />
-              ) : (
-                <div style={{ fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: '#5f6368', marginBottom: 12 }}>
-                  {ad.landingDomain ?? ad.competitorName}
-                </div>
-              )}
-              {ad.headline && (
-                <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.3, marginBottom: 12, color: '#202124' }}>
-                  {ad.headline}
-                </div>
-              )}
-              {ad.description && (
-                <div style={{ fontSize: 15, lineHeight: 1.5, color: '#5f6368' }}>{ad.description}</div>
-              )}
-              {ad.ctaText && (
-                <div
-                  style={{
-                    borderTop: '1px solid #e8eaed',
-                    marginTop: 20,
-                    paddingTop: 14,
-                    textAlign: 'right',
-                    fontWeight: 600,
-                    color: '#202124',
-                  }}
-                >
-                  {ad.ctaText} <span aria-hidden>›</span>
-                </div>
-              )}
-            </div>
-          </div>
-          {/* 원본 확인 링크 */}
-          <div style={{ fontSize: 13 }}>
-            {ad.imageUrl && (
-              <p style={{ marginTop: 0 }}>
-                <a href={ad.imageUrl} target="_blank" rel="noreferrer">배너 원본 크기로 보기 ↗</a>
-              </p>
-            )}
-            <p>
-              <a
-                href={`https://adstransparency.google.com/advertiser/${ad.advertiserId}/creative/${ad.creativeId}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                투명성 센터 원본 광고 ↗
-              </a>
-            </p>
-          </div>
-        </div>
-      ) : (
+      {/* 광고 미리보기 — 배너/영상은 패널 폭 그대로 크게 표시(원래 크기 유지),
+          문구·CTA·로고는 그 아래 원본 광고 구성으로 렌더링. */}
       <div className="panel">
         {ad.youtubeVideoId ? (
           // 비디오(YouTube): 임베드 재생
@@ -250,6 +159,32 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
           // eslint-disable-next-line @next/next/no-img-element
           <img src={ad.imageUrl} alt={ad.headline ?? ad.creativeId} style={{ maxWidth: '100%', borderRadius: 8 }} />
         ) : null}
+
+        {/* 배너 아래 텍스트 영역 — 원본 광고와 동일한 구성 */}
+        {(ad.headline || ad.description || ad.ctaText) && (
+          <div style={{ maxWidth: 720, marginTop: 18 }}>
+            {ad.logoUrl ? (
+              // 브랜드 로고 — 원본 광고처럼 헤드라인 위에 표시
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={ad.logoUrl} alt="브랜드 로고" style={{ display: 'block', maxHeight: 36, maxWidth: 200, marginBottom: 12 }} />
+            ) : (
+              <div className="muted" style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
+                {ad.landingDomain ?? ad.competitorName}
+              </div>
+            )}
+            {ad.headline && (
+              <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.25, marginBottom: 10 }}>{ad.headline}</div>
+            )}
+            {ad.description && (
+              <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>{ad.description}</div>
+            )}
+            {ad.ctaText && (
+              <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 12, fontWeight: 600 }}>
+                {ad.ctaText} <span aria-hidden>›</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 영상·이미지·문구가 모두 없으면 원본 링크로 안내 */}
         {!ad.youtubeVideoId && !ad.imageUrl && !ad.headline && !ad.description && (
@@ -271,7 +206,6 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
           </div>
         )}
       </div>
-      )}
 
       {/* 대안 — 한 광고의 variation 들 (대안마다 사이즈·문구·CTA 가 다르다). 가로 스크롤. */}
       {variations.length > 0 && (
