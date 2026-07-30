@@ -270,42 +270,70 @@ function previewUrls(variations) {
   return out;
 }
 
-async function getDetail(advertiserId, creativeId) {
+async function getDetail(advertiserId, creativeId, format) {
   const json = await rpc('LookupService/GetCreativeById', { 1: advertiserId, 2: creativeId, 5: { 1: 1, 2: 0, 3: 2410 } });
   const variations = (json['1'] && json['1']['5']) || [];
   // 이미지 광고는 응답에서 바로 추출(미리보기 fetch 불필요), 문구·랜딩은 미리보기 content.js 에서
   let imageUrl = imageFromVariations(variations);
   let videoUrl, landingUrl, headline, description, ctaText, logoUrl, youtubeVideoId;
-  // 문구를 확보하면 즉시 중단 → 대부분 1요청(기존과 동일), 문구 없는 광고만 최대 3개 variation 시도
-  for (const previewUrl of previewUrls(variations).slice(0, 3)) {
-    const r = await bg({ type: 'fetchText', url: previewUrl });
+  const varDetails = [];
+
+  // 대안(variation)별 미리보기를 순회하며 각자의 사이즈·구성요소를 추출.
+  // 비디오는 동일 영상의 사이즈 변형이라 문구 확보 시 조기 중단(요청 절약),
+  // 이미지·텍스트는 대안마다 문구·CTA·사이즈가 다르므로 전부 수집(최대 6개).
+  const isVideo = format === 'video';
+  const urls = previewUrls(variations).slice(0, isVideo ? 3 : 6);
+  for (let idx = 0; idx < urls.length; idx++) {
+    const r = await bg({ type: 'fetchText', url: urls[idx] });
     if (!r || !r.ok || !r.text) continue;
     if (!youtubeVideoId) {
       youtubeVideoId = extractYouTubeId(r.text);
       if (youtubeVideoId) videoUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
     }
-    // 비디오라도 배너 이미지가 따로 있으면 확보(discover 레이아웃 = 배너+텍스트 조합)
-    if (!imageUrl) imageUrl = await pickBestImage(imageCandidatesFromPreview(r.text)); // 크기로 로고 제외
-    // 광고 구성요소 — 대시보드에서 완성 광고를 재현하는 데 사용
-    landingUrl = landingUrl || extractLandingUrl(r.text);
-    headline = headline || fieldValue(r.text, 'headline') || fieldValue(r.text, 'longHeadline');
-    description = description || fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text');
-    ctaText = ctaText || fieldValue(r.text, 'callToActionText');
-    logoUrl = logoUrl || extractLogo(r.text);
-    // adData JSON 이 없는 HTML 마크업 템플릿이면 마크업 파서로 폴백
-    if (!headline || !description || !ctaText || !landingUrl || !logoUrl) {
-      const t = componentsFromHtmlTemplate(r.text);
-      headline = headline || t.headline;
-      description = description || t.description;
-      ctaText = ctaText || t.ctaText;
-      landingUrl = landingUrl || t.landingUrl;
-      logoUrl = logoUrl || t.logoUrl;
+    // 대안별 구성요소 — adData JSON 우선, 없으면 HTML 마크업 템플릿 파서
+    const t = componentsFromHtmlTemplate(r.text);
+    const v = {
+      idx,
+      headline: fieldValue(r.text, 'headline') || fieldValue(r.text, 'longHeadline') || t.headline,
+      description: fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text') || t.description,
+      ctaText: fieldValue(r.text, 'callToActionText') || t.ctaText,
+      logoUrl: extractLogo(r.text) || t.logoUrl,
+      imageUrl: t.imageUrl,
+      landingUrl: extractLandingUrl(r.text) || t.landingUrl,
+    };
+    const size = r.text.match(/"width"\s*:\s*(\d+)\s*,\s*"height"\s*:\s*(\d+)/);
+    if (size) {
+      v.width = Number(size[1]);
+      v.height = Number(size[2]);
     }
-    if (headline || description) break;
+    varDetails.push(v);
+
+    // 광고 대표값 = 처음 확보된 값 (목록 카드·검색용)
+    headline = headline || v.headline;
+    description = description || v.description;
+    ctaText = ctaText || v.ctaText;
+    logoUrl = logoUrl || v.logoUrl;
+    landingUrl = landingUrl || v.landingUrl;
+    // 비디오라도 배너 이미지가 따로 있으면 확보(discover 레이아웃 = 배너+텍스트 조합)
+    if (!imageUrl) imageUrl = v.imageUrl || (await pickBestImage(imageCandidatesFromPreview(r.text)));
+
+    if (isVideo && (headline || description)) break;
+    await sleep(200); // 대안 간 소간격 (본 딜레이는 광고 간에 적용)
   }
   // raw 는 그대로 보존해 저장한다(프로젝트 규칙) — 형식이 바뀌거나 추출이 실패했을 때
   // 재수집 없이 DB 의 raw 로 원인을 진단할 수 있다.
-  return { youtubeVideoId, videoUrl, imageUrl, landingUrl, headline, description, ctaText, logoUrl, raw: json };
+  return {
+    youtubeVideoId,
+    videoUrl,
+    imageUrl,
+    landingUrl,
+    headline,
+    description,
+    ctaText,
+    logoUrl,
+    variations: varDetails.length ? varDetails : undefined,
+    raw: json,
+  };
 }
 
 async function collectAdvertiser(advertiserId, cfg) {
@@ -353,7 +381,7 @@ async function collectAdvertiser(advertiserId, cfg) {
   for (let i = 0; i < fresh.length; i++) {
     const v = fresh[i];
     try {
-      const d = await getDetail(advertiserId, v.creativeId);
+      const d = await getDetail(advertiserId, v.creativeId, v.format);
       buffer.push({ ...v, ...d });
       collected += 1;
     } catch (e) {
@@ -379,6 +407,56 @@ async function collectAdvertiser(advertiserId, cfg) {
     saved: lastError ? { saved: savedTotal, error: lastError } : { saved: savedTotal },
   };
 }
+
+// ===== 스크린샷용 대안 iframe 측정 (background 의 captureVisibleTab 이 크롭할 좌표 제공) =====
+// 광고 상세 페이지의 대안 카드는 각각 fletch-render iframe: id 에 `_preview_c…_v<N>_<w>_<h>_` 포함.
+function variationIframes() {
+  const list = [...document.querySelectorAll('iframe[id*="_preview_"]')]
+    .map((el) => {
+      const m = el.id.match(/_v(\d+)_(\d+)_(\d+)_/);
+      return { el, idx: m ? Number(m[1]) : 0, width: m ? Number(m[2]) : 0, height: m ? Number(m[3]) : 0 };
+    })
+    .sort((a, b) => a.idx - b.idx);
+  return list;
+}
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === 'waitVariations') {
+    (async () => {
+      // iframe 이 나타날 때까지 대기(최대 20초) 후, 광고 렌더 완료 대기(실측 ~6초)
+      let found = 0;
+      for (let i = 0; i < 40; i++) {
+        found = variationIframes().length;
+        if (found > 0) break;
+        await sleep(500);
+      }
+      if (found === 0) return sendResponse({ ok: false, error: '대안 iframe 을 찾지 못함' });
+      await sleep(msg.renderWaitMs || 6000);
+      sendResponse({ ok: true, count: variationIframes().length });
+    })();
+    return true;
+  }
+  if (msg?.type === 'focusVariation') {
+    (async () => {
+      const list = variationIframes();
+      const v = list[msg.pos];
+      if (!v) return sendResponse({ ok: false });
+      v.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      await sleep(300);
+      const r = v.el.getBoundingClientRect();
+      sendResponse({
+        ok: true,
+        idx: v.idx,
+        width: v.width || Math.round(r.width),
+        height: v.height || Math.round(r.height),
+        rect: { x: r.x, y: r.y, w: r.width, h: r.height },
+        dpr: window.devicePixelRatio || 1,
+      });
+    })();
+    return true;
+  }
+  return false;
+});
 
 // popup → content 명령 수신
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

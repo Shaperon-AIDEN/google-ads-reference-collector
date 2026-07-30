@@ -13,6 +13,8 @@ export {
   type NewAd,
   type AdMetric,
   type NewAdMetric,
+  type AdVariation,
+  type NewAdVariation,
   type CollectionRun,
   type NewCollectionRun,
 } from './db/schema.js';
@@ -21,6 +23,7 @@ export {
 export { CompetitorRepository } from './db/repositories/competitors.js';
 export { AdRepository } from './db/repositories/ads.js';
 export { AdMetricRepository } from './db/repositories/adMetrics.js';
+export { AdVariationRepository } from './db/repositories/adVariations.js';
 export { CollectionRunRepository } from './db/repositories/collectionRuns.js';
 
 // 도메인
@@ -35,6 +38,7 @@ export {
   type AdsSource,
   type AdListItem,
   type AdDetail,
+  type AdVariationDetail,
   type AdvertiserCandidate,
   type ListAdsParams,
   type GetAdDetailParams,

@@ -276,6 +276,39 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.logoUrl).toBe('https://tpc.googlesyndication.com/simgad/LOGO'); // 정사각 소형만, 쿼리 제거
   });
 
+  // 대안(variation) 전량 수집 — 이미지·텍스트는 대안마다 문구·사이즈가 다르므로 전부 보존한다.
+  it('getAdDetail: 이미지 광고 — 대안별 문구·사이즈를 variations[] 로 전부 수집', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/a.js' } }, { '1': { '4': 'https://p/b.js' } }] } }),
+    );
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce(
+        '\\x27headline\\x27: \\x27대안1 문구\\x27,"previewMetadata":[{"iframeId":"x_v0_300_600_","width":300,"height":600}]',
+      )
+      .mockResolvedValueOnce(
+        '\\x27headline\\x27: \\x27대안2 문구\\x27,"previewMetadata":[{"iframeId":"x_v1_400_667_","width":400,"height":667}]',
+      );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR', format: 'image' });
+    expect(detail.variations).toHaveLength(2); // 문구가 있어도 중단하지 않고 전부
+    expect(detail.variations![0]).toMatchObject({ idx: 0, headline: '대안1 문구', width: 300, height: 600 });
+    expect(detail.variations![1]).toMatchObject({ idx: 1, headline: '대안2 문구', width: 400, height: 667 });
+    expect(detail.headline).toBe('대안1 문구'); // 대표값 = 첫 확보값
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it('getAdDetail: 비디오는 문구 확보 시 조기 중단 (대안 요청 절약)', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/a.js' } }, { '1': { '4': 'https://p/b.js' } }] } }),
+    );
+    const get = vi.fn(async () => 'ytimg.com/vi/abcdefghijk \\x27headline\\x27: \\x27영상 문구\\x27');
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR', format: 'video' });
+    expect(detail.headline).toBe('영상 문구');
+    expect(get).toHaveBeenCalledTimes(1); // 첫 미리보기에서 문구 확보 → 중단
+  });
+
   it('도메인 검색은 미지원(예외)', async () => {
     const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(), get: vi.fn() });
     await expect(src.searchAdvertisersByDomain({ domain: 'x.com' })).rejects.toThrow(/회사명 검색/);

@@ -16,6 +16,18 @@ export interface IngestAd {
   ctaText?: string; // CTA 버튼 문구
   logoUrl?: string; // 브랜드 로고 (http URL 또는 base64 데이터 URI)
   landingUrl?: string;
+  /** 광고 "대안"(variation) — 대안별 사이즈·문구. 전부 ad_variations 에 보존 */
+  variations?: Array<{
+    idx: number;
+    width?: number;
+    height?: number;
+    headline?: string;
+    description?: string;
+    ctaText?: string;
+    logoUrl?: string;
+    imageUrl?: string;
+    landingUrl?: string;
+  }>;
   raw?: unknown;
 }
 
@@ -118,6 +130,23 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
       });
 
       saved += 1;
+
+      // 대안(variation) 보존 — 대안마다 사이즈·문구·CTA 가 다르다 (ad_id, idx 멱등 upsert)
+      for (const v of ad.variations ?? []) {
+        await repos.adVariations.upsert({
+          adId: savedAd.id,
+          idx: v.idx,
+          width: v.width ?? null,
+          height: v.height ?? null,
+          headline: v.headline ?? null,
+          description: v.description ?? null,
+          ctaText: v.ctaText ?? null,
+          logoUrl: v.logoUrl ?? null,
+          imageUrl: v.imageUrl && isRealCreativeUrl(v.imageUrl) ? v.imageUrl : null,
+          landingUrl: v.landingUrl ?? null,
+        });
+      }
+
       if (stats) {
         await repos.adMetrics.insertSnapshot({
           adId: savedAd.id,

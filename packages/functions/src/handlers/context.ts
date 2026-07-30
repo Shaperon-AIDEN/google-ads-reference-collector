@@ -1,6 +1,7 @@
 import {
   AdMetricRepository,
   AdRepository,
+  AdVariationRepository,
   CollectionRunRepository,
   CompetitorRepository,
   createAdsSource,
@@ -37,6 +38,7 @@ export interface HandlerDeps {
     competitors: CompetitorRepository;
     ads: AdRepository;
     adMetrics: AdMetricRepository;
+    adVariations: AdVariationRepository;
     runs: CollectionRunRepository;
   };
   quota: QuotaGuard;
@@ -68,6 +70,7 @@ export async function buildDeps(env: Env = loadEnv(), now: Date = new Date()): P
       competitors: new CompetitorRepository(db),
       ads: new AdRepository(db),
       adMetrics: new AdMetricRepository(db),
+      adVariations: new AdVariationRepository(db),
       runs,
     },
     quota: new QuotaGuard({
