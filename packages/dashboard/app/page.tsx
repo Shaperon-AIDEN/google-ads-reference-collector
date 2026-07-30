@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import CompetitorSelect from '@/components/CompetitorSelect';
 import DeleteAdButton from '@/components/DeleteAdButton';
 import { bestAds, listAds, listCompetitors, type AdCard, type AdSort, type BestAd, type BestPeriod } from '@/lib/queries';
 
@@ -294,27 +295,24 @@ async function GroupedView({
           </Link>
         ))}
         <span className="muted" style={{ marginLeft: 16 }}>경쟁사:</span>
-        <Link href={qs({ competitor: '' })}>
-          <span className={`badge ${!competitor ? 'ok' : ''}`}>전체</span>
-        </Link>
         {(() => {
-          // DB 에 등록된 **모든** 경쟁사로 필터 칩 생성(광고 0건도 표시 — 등록됐는데 안 보이면 혼란).
+          // 등록된 **모든** 경쟁사를 드롭다운으로 (광고 0건도 표시 — 등록됐는데 안 보이면 혼란).
           // 같은 이름이 여러 광고주 계정으로 등록된 경우(예: 드래프터 2계정) advertiser_id 뒷자리로 구분.
           const dupNames = new Set(
             competitors.map((c) => c.name).filter((n, i, arr) => arr.indexOf(n) !== i),
           );
-          return competitors.map((c) => (
-            <Link key={c.id} href={qs({ competitor: c.id })}>
-              <span
-                className={`badge ${competitor === c.id ? 'ok' : ''}`}
-                style={c.adCount === 0 ? { opacity: 0.5 } : undefined} // 0건은 흐리게(미수집 표시)
-                title={c.adCount === 0 ? '수집된 광고 없음' : undefined}
-              >
-                {c.name}
-                {dupNames.has(c.name) ? ` ·${c.advertiserId.slice(-4)}` : ''} ({c.adCount})
-              </span>
-            </Link>
-          ));
+          const options = competitors.map((c) => ({
+            id: c.id,
+            label: dupNames.has(c.name) ? `${c.name} ·${c.advertiserId.slice(-4)}` : c.name,
+            adCount: c.adCount,
+          }));
+          // competitor 를 제외한 현재 필터 — 드롭다운 선택 시 보존
+          const baseParams: Record<string, string> = { sort };
+          if (format) baseParams.format = format;
+          if (minViews) baseParams.minViews = String(minViews);
+          if (from) baseParams.from = from;
+          if (to) baseParams.to = to;
+          return <CompetitorSelect competitors={options} value={competitor ?? ''} baseParams={baseParams} />;
         })()}
       </div>
 
