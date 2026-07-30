@@ -32,9 +32,11 @@ function extractYouTubeId(html) {
   const field = html.match(/video_id(?:\\x27|["'])?\s*:?\s*(?:\\x27|["'])([A-Za-z0-9_-]{11})/);
   return field ? field[1] : undefined;
 }
+// 필드명 따옴표 유무가 섞여 있다 — `destination_url: \x27값\x27`(무따옴표)와
+// `\x27headline\x27: \x27값\x27`(따옴표) 둘 다 잡아야 랜딩 URL 이 확보된다.
 function fieldValue(html, field) {
-  let m = html.match(new RegExp(`${field}\\\\x27\\s*:\\s*\\\\x27(.*?)\\\\x27`));
-  if (!m) m = html.match(new RegExp(`["']${field}["']\\s*:\\s*["']([^"']+)["']`));
+  let m = html.match(new RegExp(`(?:\\\\x27|["'])?${field}(?:\\\\x27|["'])?\\s*:\\s*\\\\x27(.*?)\\\\x27`));
+  if (!m) m = html.match(new RegExp(`["']?${field}["']?\\s*:\\s*["']([^"']+)["']`));
   return m && m[1] ? unescapeHex(m[1]).trim() : undefined;
 }
 function extractLandingUrl(html) {
@@ -193,6 +195,11 @@ async function getDetail(advertiserId, creativeId) {
       if (youtubeVideoId) videoUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
       else if (!imageUrl) imageUrl = await pickBestImage(imageCandidatesFromPreview(r.text)); // 크기로 로고 제외
       landingUrl = extractLandingUrl(r.text);
+      // 광고 문구 — google_template_data 의 headline, 없으면 description/longHeadline 폴백
+      headline =
+        fieldValue(r.text, 'headline') ??
+        fieldValue(r.text, 'longHeadline') ??
+        fieldValue(r.text, 'description');
     }
   }
   return { youtubeVideoId, videoUrl, imageUrl, landingUrl, headline };
