@@ -50,6 +50,13 @@ function normalizeFormat(f: string): AdFormat {
   return VALID_FORMATS.has(f as AdFormat) ? (f as AdFormat) : 'text';
 }
 
+/** 로고로 판정된 URL 과 같은 이미지는 광고 이미지로 저장하지 않는다 (로고 오선택 방지, 쿼리 무시 비교) */
+function rejectLogoAsImage(imageUrl?: string | null, logoUrl?: string | null): string | null {
+  if (!imageUrl || !isRealCreativeUrl(imageUrl)) return null;
+  if (logoUrl && imageUrl.split('?')[0] === logoUrl.split('?')[0]) return null;
+  return imageUrl;
+}
+
 /** first/last 게재일로 총 게재일수 계산 (양끝 포함) */
 function daysBetween(first?: string, last?: string): number | null {
   if (!first || !last) return null;
@@ -116,7 +123,7 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
         youtubeVideoId: youtubeVideoId ?? null,
         publishedAt: stats?.publishedAt ? new Date(stats.publishedAt) : null,
         // 서버측 재검증: 확장이 (옛 코드로) 로고/HTML URL 을 보내도 여기서 거른다(안전망).
-        imageUrl: ad.imageUrl && isRealCreativeUrl(ad.imageUrl) ? ad.imageUrl : null,
+        imageUrl: rejectLogoAsImage(ad.imageUrl, ad.logoUrl),
         headline: ad.headline ?? null,
         description: ad.description ?? null,
         ctaText: ad.ctaText ?? null,
@@ -142,7 +149,7 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
           description: v.description ?? null,
           ctaText: v.ctaText ?? null,
           logoUrl: v.logoUrl ?? null,
-          imageUrl: v.imageUrl && isRealCreativeUrl(v.imageUrl) ? v.imageUrl : null,
+          imageUrl: rejectLogoAsImage(v.imageUrl, v.logoUrl ?? ad.logoUrl),
           landingUrl: v.landingUrl ?? null,
         });
       }
