@@ -23,13 +23,12 @@ export default function DeleteAdButton({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [gone, setGone] = useState(false);
 
   async function onDelete(e: React.MouseEvent) {
     // 카드가 <Link> 로 감싸져 있으므로 네비게이션을 막는다
     e.preventDefault();
     e.stopPropagation();
-    if (busy || gone) return;
+    if (busy) return;
     if (!confirm('이 광고를 삭제할까요? (다음 수집 때 신규로 다시 들어올 수 있습니다)')) return;
 
     setBusy(true);
@@ -40,7 +39,9 @@ export default function DeleteAdButton({
         alert(`삭제 실패: ${data.error ?? res.status}`);
         return;
       }
-      setGone(true);
+      // ⚠️ 여기서 버튼을 숨기는 로컬 상태(gone)를 두면 안 된다 — router.refresh() 후 같은 자리에
+      // 온 "다른 광고"에 클라이언트 상태가 남아 삭제 버튼이 사라진 채 유지된다(실측 버그).
+      // 삭제된 카드는 서버 갱신으로 목록에서 없어지므로 숨김 상태가 필요 없다.
       if (redirectTo) router.push(redirectTo);
       else router.refresh();
     } catch (err) {
@@ -49,8 +50,6 @@ export default function DeleteAdButton({
       setBusy(false);
     }
   }
-
-  if (gone && !redirectTo) return null;
 
   return (
     <button
