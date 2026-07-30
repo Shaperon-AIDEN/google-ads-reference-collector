@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull, not, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, not, or, sql } from 'drizzle-orm';
 import type { Db } from '../client.js';
 import { ads, type Ad, type NewAd } from '../schema.js';
 
@@ -8,22 +8,25 @@ export class AdRepository {
   /**
    * creative_id 목록 중 이미 저장된 것을 반환 (신규 감지용).
    *
-   * ⚠️ 단, **불완전 수집분은 "기존"으로 보지 않는다** — 이미지·텍스트 광고 중 `raw` 가 없는 행은
-   * 미리보기 URL 을 variation[0] 에서만 찾던 버그로 문구·CTA·랜딩이 누락된 채 저장된 것이라
-   * 재수집 대상으로 넘긴다(upsert 라 삭제 없이 제자리 보강). raw 는 현재 파이프라인의
-   * 수집 표식이라, 한 번 재수집되면 raw 가 채워져 다음 실행부터는 다시 요청하지 않는다.
+   * ⚠️ 단, **불완전 수집분은 "기존"으로 보지 않는다** — 재수집 대상(upsert 로 삭제 없이 제자리 보강):
+   *  1) 이미지·텍스트 광고 중 `raw` 없음 — 구버전 파이프라인 수집분(문구·CTA·랜딩 누락).
+   *  2) **썸네일이 될 시각 요소가 하나도 없는 광고** — youtube_video_id·image_url·headline·
+   *     description 전부 null (목록에서 빈 placeholder 로 보이는 것들). 일시 오류로 비었던
+   *     광고가 다음 수집에서 자동 복구된다.
    */
   async existingCreativeIds(creativeIds: string[]): Promise<Set<string>> {
     if (creativeIds.length === 0) return new Set();
+    const incompleteLegacy = and(inArray(ads.format, ['image', 'text']), isNull(ads.raw))!;
+    const noVisual = and(
+      isNull(ads.youtubeVideoId),
+      isNull(ads.imageUrl),
+      isNull(ads.headline),
+      isNull(ads.description),
+    )!;
     const rows = await this.db
       .select({ creativeId: ads.creativeId })
       .from(ads)
-      .where(
-        and(
-          inArray(ads.creativeId, creativeIds),
-          not(and(inArray(ads.format, ['image', 'text']), isNull(ads.raw))!),
-        ),
-      );
+      .where(and(inArray(ads.creativeId, creativeIds), not(or(incompleteLegacy, noVisual)!)));
     return new Set(rows.map((r) => r.creativeId));
   }
 
