@@ -36,6 +36,23 @@ function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: 
           // loading="lazy": 화면에 보일 때만 로드 → YouTube 썸네일 대량 동시요청 스로틀링(빈 칸) 방지
           // eslint-disable-next-line @next/next/no-img-element
           <img className="thumb" src={thumb} alt={ad.creativeId} loading="lazy" decoding="async" style={{ objectFit: 'cover' }} />
+        ) : ad.format === 'text' && ad.headline ? (
+          // 검색형 텍스트 광고(이미지 자산 없음): 상세와 동일하게 검색 광고 스타일 미니 카드
+          <div
+            className="thumb"
+            style={{ background: '#fff', padding: '14px 16px', textAlign: 'left', display: 'block', overflow: 'hidden' }}
+          >
+            {ad.landingDomain && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <span aria-hidden style={{ fontSize: 11 }}>🌐</span>
+                <span style={{ color: '#202124', fontSize: 11 }}>{ad.landingDomain}</span>
+              </div>
+            )}
+            <div style={{ color: '#1a4fd6', fontSize: 15, fontWeight: 500, lineHeight: 1.35, marginBottom: 6 }}>{ad.headline}</div>
+            {ad.description && (
+              <div style={{ color: '#4d5156', fontSize: 12, lineHeight: 1.45 }}>{ad.description}</div>
+            )}
+          </div>
         ) : (
           <div className="thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12, textAlign: 'center' }}>
             {ad.headline ? (
