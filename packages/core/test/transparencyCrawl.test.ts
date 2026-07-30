@@ -204,6 +204,53 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.imageUrl).toBeUndefined();
   });
 
+  // 실측 회귀: 이미지 광고는 variation[0] 이 정적 img HTML(['3']['2'])이라 ['1']['4'] 미리보기 URL 이
+  // 없고, 미리보기는 뒤쪽 variation 에만 있다. variation[0] 만 보면 문구·CTA·랜딩이 통째로 누락됐다.
+  it('getAdDetail: 이미지 광고 — 뒤쪽 variation 의 미리보기에서 문구·CTA·랜딩 확보', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': {
+          '5': [
+            { '3': { '2': '<img src="https://tpc.googlesyndication.com/archive/simgad/AD" width="1920" height="1005">' } },
+            { '1': { '4': 'https://p/content.js' } },
+          ],
+        },
+      }),
+    );
+    const get = vi.fn(async () =>
+      [
+        'destination_url: \\x27https://dusk.example/lp\\x27',
+        '\\x27headline\\x27: \\x27동양인 잇몸이 유독 약한 이유\\x27',
+        '\\x27description\\x27: \\x27한 방울이면 차오릅니다\\x27',
+        '\\x27callToActionText\\x27: \\x27열기\\x27',
+      ].join(','),
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_IMG' });
+    expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/archive/simgad/AD'); // 응답 직접 추출 유지
+    expect(detail.headline).toBe('동양인 잇몸이 유독 약한 이유');
+    expect(detail.description).toBe('한 방울이면 차오릅니다');
+    expect(detail.ctaText).toBe('열기');
+    expect(detail.landingUrl).toBe('https://dusk.example/lp');
+    expect(get).toHaveBeenCalledTimes(1); // 문구 확보 즉시 중단 → 추가 요청 없음
+  });
+
+  it('getAdDetail: 첫 variation 에 문구 없으면 다음 variation 미리보기까지 시도(최대 3)', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': { '5': [{ '1': { '4': 'https://p/a.js' } }, { '1': { '4': 'https://p/b.js' } }] },
+      }),
+    );
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce('빈 레이아웃 — 문구 없음')
+      .mockResolvedValueOnce('\\x27headline\\x27: \\x27두번째 레이아웃 문구\\x27');
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR' });
+    expect(detail.headline).toBe('두번째 레이아웃 문구');
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
   it('도메인 검색은 미지원(예외)', async () => {
     const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(), get: vi.fn() });
     await expect(src.searchAdvertisersByDomain({ domain: 'x.com' })).rejects.toThrow(/회사명 검색/);

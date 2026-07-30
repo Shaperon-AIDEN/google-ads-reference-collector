@@ -91,6 +91,21 @@ function imageFromVariations(variations: Json[]): string | undefined {
   return nonSquare[0]?.url;
 }
 
+/**
+ * 미리보기 content.js URL 을 **모든** variation 에서 모은다.
+ * ⚠️ variations[0] 만 보면 안 된다(실측): 이미지 광고는 index 0 이 `['3']['2']`(정적 img HTML)이라
+ * `['1']['4']` 가 없고, 미리보기 URL 은 뒤쪽 variation 에만 있다 → 문구·CTA·랜딩이 통째로 누락됐다.
+ * variation 마다 레이아웃이 달라(allowedVariations) 문구 유무도 다르므로 순서대로 시도한다.
+ */
+function previewUrls(variations: Json[]): string[] {
+  const out: string[] = [];
+  for (const v of variations) {
+    const u = (v?.['1'] as Json | undefined)?.['4'];
+    if (typeof u === 'string' && u && !out.includes(u)) out.push(u);
+  }
+  return out;
+}
+
 /** \xNN 16진 이스케이프 복원 */
 function unescapeHex(s: string): string {
   return s.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
@@ -223,7 +238,6 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     const json = this.parse(await this.t.rpc('LookupService/GetCreativeById', JSON.stringify(req)), 'getAdDetail');
 
     const variations = ((json['1'] as Json | undefined)?.['5'] as Json[] | undefined) ?? [];
-    const previewUrl = ((variations[0]?.['1'] as Json | undefined)?.['4'] as string | undefined) ?? undefined;
 
     let videoUrl: string | undefined;
     // 이미지 광고: 응답에 <img src> 직접 포함 → 미리보기 fetch 없이 추출
@@ -232,21 +246,23 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     let headline: string | undefined;
     let description: string | undefined;
     let ctaText: string | undefined;
-    if (previewUrl) {
-      // 비디오·텍스트 광고: 미리보기 content.js 를 받아 YouTube ID·랜딩·구성요소 추출
+    // 미리보기 content.js 에서 YouTube ID·랜딩·구성요소 추출.
+    // 문구를 확보하면 즉시 중단 → 대부분 1요청(기존과 동일 비용), 문구 없는 광고만 최대 3개 시도.
+    for (const previewUrl of previewUrls(variations).slice(0, 3)) {
       try {
         const html = await this.t.get(previewUrl);
         const ytId = extractYouTubeId(html);
-        if (ytId) videoUrl = `https://www.youtube.com/embed/${ytId}`;
+        if (ytId && !videoUrl) videoUrl = `https://www.youtube.com/embed/${ytId}`;
         // 비디오라도 배너 이미지가 따로 있으면 확보한다(discover 레이아웃은 배너+텍스트 조합)
         if (!imageUrl) imageUrl = extractImageUrl(html);
-        landingUrl = extractLandingUrl(html); // visible_url → 랜딩. landing_domain 은 핸들러가 계산
+        landingUrl ??= extractLandingUrl(html); // visible_url → 랜딩. landing_domain 은 핸들러가 계산
         // 광고 구성요소 — 대시보드에서 완성 광고를 재현하는 데 사용
-        headline = fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline');
-        description = fieldValue(html, 'description') ?? fieldValue(html, 'body_text');
-        ctaText = fieldValue(html, 'callToActionText');
+        headline ??= fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline');
+        description ??= fieldValue(html, 'description') ?? fieldValue(html, 'body_text');
+        ctaText ??= fieldValue(html, 'callToActionText');
+        if (headline || description) break;
       } catch {
-        // 미리보기 fetch 실패는 상세 저장을 막지 않는다
+        // 개별 미리보기 실패는 상세 저장을 막지 않는다 (다음 variation 시도)
       }
     }
 

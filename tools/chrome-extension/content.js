@@ -218,28 +218,44 @@ function imageFromVariations(variations) {
   return undefined;
 }
 
+// 미리보기 content.js URL 을 **모든** variation 에서 모은다.
+// ⚠️ variations[0] 만 보면 안 된다(실측): 이미지 광고는 index 0 이 ['3']['2'](정적 img HTML)이라
+// ['1']['4'] 가 없고 미리보기 URL 은 뒤쪽 variation 에만 있다 → 문구·CTA·랜딩이 통째로 누락됐다.
+function previewUrls(variations) {
+  const out = [];
+  for (const v of variations) {
+    const u = v && v['1'] && v['1']['4'];
+    if (typeof u === 'string' && u && !out.includes(u)) out.push(u);
+  }
+  return out;
+}
+
 async function getDetail(advertiserId, creativeId) {
   const json = await rpc('LookupService/GetCreativeById', { 1: advertiserId, 2: creativeId, 5: { 1: 1, 2: 0, 3: 2410 } });
   const variations = (json['1'] && json['1']['5']) || [];
-  const previewUrl = variations[0] && variations[0]['1'] && variations[0]['1']['4'];
-  // 이미지 광고는 응답에서 바로 추출(미리보기 fetch 불필요), 비디오·텍스트는 미리보기 content.js
+  // 이미지 광고는 응답에서 바로 추출(미리보기 fetch 불필요), 문구·랜딩은 미리보기 content.js 에서
   let imageUrl = imageFromVariations(variations);
   let videoUrl, landingUrl, headline, description, ctaText, youtubeVideoId;
-  if (previewUrl) {
+  // 문구를 확보하면 즉시 중단 → 대부분 1요청(기존과 동일), 문구 없는 광고만 최대 3개 variation 시도
+  for (const previewUrl of previewUrls(variations).slice(0, 3)) {
     const r = await bg({ type: 'fetchText', url: previewUrl });
-    if (r && r.ok && r.text) {
+    if (!r || !r.ok || !r.text) continue;
+    if (!youtubeVideoId) {
       youtubeVideoId = extractYouTubeId(r.text);
       if (youtubeVideoId) videoUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
-      // 비디오라도 배너 이미지가 따로 있으면 확보(discover 레이아웃 = 배너+텍스트 조합)
-      if (!imageUrl) imageUrl = await pickBestImage(imageCandidatesFromPreview(r.text)); // 크기로 로고 제외
-      landingUrl = extractLandingUrl(r.text);
-      // 광고 구성요소 — 대시보드에서 완성 광고를 재현하는 데 사용
-      headline = fieldValue(r.text, 'headline') ?? fieldValue(r.text, 'longHeadline');
-      description = fieldValue(r.text, 'description') ?? fieldValue(r.text, 'body_text');
-      ctaText = fieldValue(r.text, 'callToActionText');
     }
+    // 비디오라도 배너 이미지가 따로 있으면 확보(discover 레이아웃 = 배너+텍스트 조합)
+    if (!imageUrl) imageUrl = await pickBestImage(imageCandidatesFromPreview(r.text)); // 크기로 로고 제외
+    // 광고 구성요소 — 대시보드에서 완성 광고를 재현하는 데 사용
+    landingUrl = landingUrl || extractLandingUrl(r.text);
+    headline = headline || fieldValue(r.text, 'headline') || fieldValue(r.text, 'longHeadline');
+    description = description || fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text');
+    ctaText = ctaText || fieldValue(r.text, 'callToActionText');
+    if (headline || description) break;
   }
-  return { youtubeVideoId, videoUrl, imageUrl, landingUrl, headline, description, ctaText };
+  // raw 는 그대로 보존해 저장한다(프로젝트 규칙) — 형식이 바뀌거나 추출이 실패했을 때
+  // 재수집 없이 DB 의 raw 로 원인을 진단할 수 있다.
+  return { youtubeVideoId, videoUrl, imageUrl, landingUrl, headline, description, ctaText, raw: json };
 }
 
 async function collectAdvertiser(advertiserId, cfg) {
