@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import DeleteAdButton from '@/components/DeleteAdButton';
 import { getAd } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
@@ -91,7 +92,11 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
 
   return (
     <>
-      <p><Link href="/">← 레퍼런스 목록</Link></p>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <p style={{ margin: 0 }}><Link href="/">← 레퍼런스 목록</Link></p>
+        {/* 잘못 수집된 광고 정리 — 삭제 후 목록으로 이동 */}
+        <DeleteAdButton adId={ad.id} label="이 광고 삭제" redirectTo="/" />
+      </div>
       <h1>{ad.competitorName} <span className={`badge ${ad.format}`}>{ad.format}</span></h1>
 
       <div className="panel">
