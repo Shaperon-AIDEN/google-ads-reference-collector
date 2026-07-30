@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { ingestBase: 'http://localhost:7071/api', num: 40, delayMs: 3000, region: 'KR', flushEvery: 5, detailWaitMs: 6000 };
+const DEFAULTS = { ingestBase: 'http://localhost:7071/api', num: 40, delayMs: 3000, region: 'KR', flushEvery: 5, detailWaitMs: 0 };
 
 function log(msg) {
   const el = $('log');
@@ -24,8 +24,9 @@ function readCfg() {
     delayMs: Number($('delayMs').value) || 3000,
     region: $('region').value.trim() || 'KR',
     flushEvery: Number($('flushEvery').value) || 5,
-    // 이미지·텍스트 상세 수집 시 RPC 후 대기(ms) — 0 이면 대기 없음
-    detailWaitMs: Number($('detailWaitMs').value) >= 0 ? Number($('detailWaitMs').value) : 6000,
+    // 이미지·텍스트 상세 수집 시 RPC 후 대기(ms) — 기본 0(대기 없음). content.js 는 정적이라
+    // 데이터 수집엔 대기가 불필요함이 실측으로 확인됨(백필 0ms = 6000ms 결과 동일).
+    detailWaitMs: Number($('detailWaitMs').value) >= 0 ? Number($('detailWaitMs').value) : 0,
   };
   chrome.storage.local.set({ cfg });
   return cfg;
