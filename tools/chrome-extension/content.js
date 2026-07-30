@@ -294,7 +294,7 @@ function previewUrls(variations) {
   return out;
 }
 
-async function getDetail(advertiserId, creativeId, format) {
+async function getDetail(advertiserId, creativeId, format, detailWaitMs) {
   const json = await rpc('LookupService/GetCreativeById', { 1: advertiserId, 2: creativeId, 5: { 1: 1, 2: 0, 3: 2410 } });
   const variations = (json['1'] && json['1']['5']) || [];
   // 이미지 광고는 응답에서 바로 추출(미리보기 fetch 불필요), 문구·랜딩은 미리보기 content.js 에서
@@ -306,6 +306,8 @@ async function getDetail(advertiserId, creativeId, format) {
   // 비디오는 동일 영상의 사이즈 변형이라 문구 확보 시 조기 중단(요청 절약),
   // 이미지·텍스트는 대안마다 문구·CTA·사이즈가 다르므로 전부 수집(최대 6개).
   const isVideo = format === 'video';
+  // 이미지·텍스트: 상세(RPC) 후 대기하고 나서 미리보기 수집 (팝업 "상세 대기(ms)", 기본 6000)
+  if (!isVideo && detailWaitMs > 0) await sleep(detailWaitMs);
   const urls = previewUrls(variations).slice(0, isVideo ? 3 : 6);
   for (let idx = 0; idx < urls.length; idx++) {
     const r = await bg({ type: 'fetchText', url: urls[idx] });
@@ -406,7 +408,7 @@ async function collectAdvertiser(advertiserId, cfg) {
   for (let i = 0; i < fresh.length; i++) {
     const v = fresh[i];
     try {
-      const d = await getDetail(advertiserId, v.creativeId, v.format);
+      const d = await getDetail(advertiserId, v.creativeId, v.format, Number(cfg.detailWaitMs) || 0);
       buffer.push({ ...v, ...d });
       collected += 1;
     } catch (e) {
