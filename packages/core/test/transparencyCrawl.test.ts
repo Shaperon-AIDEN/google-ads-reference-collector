@@ -309,6 +309,25 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(get).toHaveBeenCalledTimes(1); // 첫 미리보기에서 문구 확보 → 중단
   });
 
+  // 실측 회귀: 검색형 텍스트 광고("Single Ad Rendering Service") — adData·마크업 템플릿이 없고
+  // AF_dataServiceRequests "361903925" 배열에 [ …null×7, headline, visibleUrl, description ] 로 들어있다.
+  it('getAdDetail: 검색형 텍스트 광고 — AF_dataServiceRequests 에서 문구·랜딩 추출', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    const get = vi.fn(
+      async () =>
+        `var AF_dataServiceRequests = {'ds:0' : {id:'xFkH7c',request:[[{"361903925":[null,null,null,null,null,null,null,` +
+        `"출퇴근부터 운동까지 함께 해요 - 골전도 이어폰 제대로 시작해요","www.basetune.co.kr/","귀가 편해야 음악도 오래 듣게 되더라구요",null,null,5,{}]}]]}}` +
+        `,"previewMetadata":[{"width":380,"height":320}]`,
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_SEARCH', format: 'text' });
+    expect(detail.headline).toBe('출퇴근부터 운동까지 함께 해요 - 골전도 이어폰 제대로 시작해요');
+    expect(detail.description).toBe('귀가 편해야 음악도 오래 듣게 되더라구요');
+    expect(detail.landingUrl).toBe('https://www.basetune.co.kr/');
+    expect(detail.imageUrl).toBeUndefined(); // 이 유형은 크리에이티브 이미지가 원래 없다
+    expect(detail.variations![0]).toMatchObject({ width: 380, height: 320 });
+  });
+
   it('도메인 검색은 미지원(예외)', async () => {
     const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(), get: vi.fn() });
     await expect(src.searchAdvertisersByDomain({ domain: 'x.com' })).rejects.toThrow(/회사명 검색/);

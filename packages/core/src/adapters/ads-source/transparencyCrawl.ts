@@ -183,6 +183,36 @@ function componentsFromHtmlTemplate(rawHtml: string): {
   return { headline, description, ctaText, landingUrl, logoUrl, imageUrl };
 }
 
+/**
+ * ⚠️ content.js 템플릿 세 번째 유형(실측): **"Single Ad Rendering Service"(검색형 텍스트 광고)**.
+ * adData 도 마크업 템플릿도 없고, `AF_dataServiceRequests` 의 `"361903925"` 배열에
+ * `[ …null×7, headline, visibleUrl, description, … ]` 로 들어있다. 크리에이티브 이미지는
+ * 원래 없는 광고 유형이다(내장 data:image 는 별점 등 UI 아이콘 조각).
+ */
+function componentsFromSearchAdTemplate(rawHtml: string): {
+  headline?: string;
+  description?: string;
+  landingUrl?: string;
+} {
+  const d = unescapeHex(rawHtml);
+  const m = d.match(/"361903925":\[(?:[^,"[\]]*,){7}"((?:[^"\\]|\\.)*)","((?:[^"\\]|\\.)*)","((?:[^"\\]|\\.)*)"/);
+  if (!m) return {};
+  const dec = (s: string) => {
+    try {
+      return JSON.parse(`"${s}"`) as string;
+    } catch {
+      return s;
+    }
+  };
+  const headline = dec(m[1]!).trim() || undefined;
+  const visible = dec(m[2]!).trim();
+  const description = dec(m[3]!).trim() || undefined;
+  let landingUrl: string | undefined;
+  if (/^https?:\/\//i.test(visible)) landingUrl = visible;
+  else if (/^[a-z0-9.-]+\.[a-z]{2,}/i.test(visible)) landingUrl = `https://${visible}`;
+  return { headline, description, landingUrl };
+}
+
 /** \xNN 16진 이스케이프 복원 */
 function unescapeHex(s: string): string {
   return s.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
@@ -337,16 +367,18 @@ export class TransparencyCrawlAdsSource implements AdsSource {
         const ytId = extractYouTubeId(html);
         if (ytId && !videoUrl) videoUrl = `https://www.youtube.com/embed/${ytId}`;
 
-        // 대안별 구성요소 — adData JSON 우선, 없으면 HTML 마크업 템플릿 파서
+        // 대안별 구성요소 — adData JSON → HTML 마크업 템플릿 → 검색형(Single Ad) 템플릿 순 폴백
         const t = componentsFromHtmlTemplate(html);
+        const s = componentsFromSearchAdTemplate(html);
         const v: AdVariationDetail = {
           idx,
-          headline: fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline') ?? t.headline,
-          description: fieldValue(html, 'description') ?? fieldValue(html, 'body_text') ?? t.description,
+          headline: fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline') ?? t.headline ?? s.headline,
+          description:
+            fieldValue(html, 'description') ?? fieldValue(html, 'body_text') ?? t.description ?? s.description,
           ctaText: fieldValue(html, 'callToActionText') ?? t.ctaText,
           logoUrl: extractLogo(html) ?? t.logoUrl,
           imageUrl: t.imageUrl,
-          landingUrl: extractLandingUrl(html) ?? t.landingUrl,
+          landingUrl: extractLandingUrl(html) ?? t.landingUrl ?? s.landingUrl,
         };
         // 광고 단위 크기 — previewMetadata 실측값
         const size = html.match(/"width"\s*:\s*(\d+)\s*,\s*"height"\s*:\s*(\d+)/);
