@@ -125,8 +125,12 @@ async function rpc(path, reqObj) {
   const text = await res.text();
   const t = text.trimStart();
   if (t.startsWith('<')) throw new Error('BLOCKED'); // HTML = 차단 페이지
-  if (res.status === 400) throw new Error('RPC 400: Google 로그인 상태로 보임 — 로그아웃한 브라우저/프로필에서 실행하세요(SAPISID 쿠키 충돌).');
-  if (!res.ok) throw new Error(`RPC ${res.status}: ${t.slice(0, 80)}`);
+  if (!res.ok) {
+    // 응답 본문을 반드시 함께 노출한다 — 400 의 원인은 로그인(SAPISID) 외에도
+    // 잘못된 advertiser_id·요청 형식 등이 있어, 본문 없이는 오진하게 된다.
+    const hint = res.status === 400 ? ' [400 원인 후보: 로그인 쿠키(SAPISID) 충돌 / 잘못된 advertiser_id / 요청 형식]' : '';
+    throw new Error(`RPC ${res.status}: ${t.slice(0, 200) || '(본문 없음)'}${hint}`);
+  }
   // Google 은 JSON 하이재킹 방지로 )]}' 접두어를 붙일 수 있음 → 정상 응답
   return JSON.parse(t.replace(/^\)\]\}'\s*/, ''));
 }
