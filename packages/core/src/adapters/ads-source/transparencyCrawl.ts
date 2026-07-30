@@ -116,6 +116,72 @@ function extractLogo(html: string): string | undefined {
   return undefined;
 }
 
+/**
+ * ⚠️ content.js 템플릿은 두 종류다(실측):
+ *  1) adData JSON 템플릿(discover 등) — `\x27headline\x27: \x27…\x27` → fieldValue 로 추출
+ *  2) **HTML 마크업 템플릿**(creativeType 46 이미지 레이아웃) — adData 없이 완성 HTML 이 들어있다.
+ *     문구는 `title`/`body` 클래스 div 안의 <a> 텍스트, CTA 는 `data-asoch-targets="…btnClk…"` 앵커,
+ *     랜딩은 클릭 URL 의 `adurl=` 파라미터, 로고는 정사각 소형(w=h≤200) background-image simgad.
+ * fieldValue 가 못 찾으면 이 파서가 폴백으로 뛴다.
+ */
+function componentsFromHtmlTemplate(rawHtml: string): {
+  headline?: string;
+  description?: string;
+  ctaText?: string;
+  landingUrl?: string;
+  logoUrl?: string;
+  imageUrl?: string;
+} {
+  const d = unescapeHex(rawHtml);
+  const clean = (s: string | undefined) =>
+    s
+      ? s
+          .replace(/<br\s*\/?>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim() || undefined
+      : undefined;
+  const pick = (cls: string) =>
+    clean(d.match(new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"[^>]*>\\s*<a[^>]*>([\\s\\S]*?)</a>`))?.[1]);
+
+  const headline = pick('title');
+  const description = pick('body');
+
+  let ctaText: string | undefined;
+  for (const m of d.matchAll(/<a[^>]*data-asoch-targets="[^"]*btnClk[^"]*"[^>]*>([\s\S]*?)<\/a>/g)) {
+    ctaText = clean(m[1]);
+    if (ctaText) break;
+  }
+
+  let landingUrl: string | undefined;
+  const adurl = d.match(/adurl=([^&"'\s]+)/)?.[1];
+  if (adurl) {
+    try {
+      const u = decodeURIComponent(adurl);
+      if (/^https?:\/\//i.test(u)) landingUrl = u;
+    } catch {
+      // 잘못된 인코딩은 무시
+    }
+  }
+
+  // 배경이미지 simgad 를 로고(정사각 소형 w=h≤200)와 배너(그 외, 최대 면적)로 분류
+  let logoUrl: string | undefined;
+  let imageUrl: string | undefined;
+  let bestArea = 0;
+  for (const m of d.matchAll(/background-image:url\((https?:\/\/[^)]*\/simgad\/[^)?]+)\?w=(\d+)&h=(\d+)/g)) {
+    const w = Number(m[2]);
+    const h = Number(m[3]);
+    if (w === h && w <= 200) {
+      logoUrl ??= m[1]; // 쿼리 제거 → 원본 해상도
+    } else if (w * h > bestArea) {
+      bestArea = w * h;
+      imageUrl = m[1];
+    }
+  }
+
+  return { headline, description, ctaText, landingUrl, logoUrl, imageUrl };
+}
+
 /** \xNN 16진 이스케이프 복원 */
 function unescapeHex(s: string): string {
   return s.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
@@ -264,14 +330,24 @@ export class TransparencyCrawlAdsSource implements AdsSource {
         const html = await this.t.get(previewUrl);
         const ytId = extractYouTubeId(html);
         if (ytId && !videoUrl) videoUrl = `https://www.youtube.com/embed/${ytId}`;
-        // 비디오라도 배너 이미지가 따로 있으면 확보한다(discover 레이아웃은 배너+텍스트 조합)
-        if (!imageUrl) imageUrl = extractImageUrl(html);
         landingUrl ??= extractLandingUrl(html); // visible_url → 랜딩. landing_domain 은 핸들러가 계산
         // 광고 구성요소 — 대시보드에서 완성 광고를 재현하는 데 사용
         headline ??= fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline');
         description ??= fieldValue(html, 'description') ?? fieldValue(html, 'body_text');
         ctaText ??= fieldValue(html, 'callToActionText');
         logoUrl ??= extractLogo(html);
+        // adData JSON 이 없는 HTML 마크업 템플릿이면 마크업 파서로 폴백
+        if (!headline || !description || !ctaText || !landingUrl || !logoUrl || !imageUrl) {
+          const t = componentsFromHtmlTemplate(html);
+          headline ??= t.headline;
+          description ??= t.description;
+          ctaText ??= t.ctaText;
+          landingUrl ??= t.landingUrl;
+          logoUrl ??= t.logoUrl;
+          imageUrl ??= t.imageUrl; // 배너/로고를 크기 파라미터로 구분해 선택
+        }
+        // 비디오라도 배너 이미지가 따로 있으면 확보한다(discover 레이아웃은 배너+텍스트 조합)
+        if (!imageUrl) imageUrl = extractImageUrl(html);
         if (headline || description) break;
       } catch {
         // 개별 미리보기 실패는 상세 저장을 막지 않는다 (다음 variation 시도)

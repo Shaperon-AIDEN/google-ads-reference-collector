@@ -253,6 +253,29 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(get).toHaveBeenCalledTimes(2);
   });
 
+  // 실측 회귀: adData JSON 이 없는 HTML 마크업 템플릿(creativeType 46 이미지 레이아웃).
+  // 문구는 title/body 클래스 <a>, CTA 는 btnClk 앵커, 랜딩은 adurl=, 로고는 정사각 소형 bg 이미지.
+  it('getAdDetail: HTML 마크업 템플릿에서 문구·CTA·랜딩·로고 추출 (adData 없음)', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/content.js' } }] } }),
+    );
+    const get = vi.fn(
+      async () =>
+        '.ns-x-e-10{background-image:url(https://tpc.googlesyndication.com/simgad/BANNER?w\\x3d400\\x26h\\x3d209\\x26tw\\x3d1)}' +
+        '.ns-x-e-11{background-image:url(https://tpc.googlesyndication.com/simgad/LOGO?w\\x3d100\\x26h\\x3d100\\x26tw\\x3d1)}' +
+        '\\x3cdiv class\\x3d\\x22ns-x-e-12 title milo-font\\x22\\x3e\\x3ca class\\x3d\\x22ns-x-e-13\\x22 href\\x3d\\x22https://g/aclk?adurl\\x3dhttps%3A%2F%2Fparodex.kr%2Fproduct%3Fno%3D13\\x22\\x3e일반 치약의 20배\\x3cbr\\x3e효과\\x3c/a\\x3e\\x3c/div\\x3e' +
+        '\\x3cdiv class\\x3d\\x22ns-x-e-15 body\\x22\\x3e\\x3ca class\\x3d\\x22ns-x-e-16\\x22\\x3e온 가족 칫솔 닿는 치약 쓰시나요?\\x3c/a\\x3e\\x3c/div\\x3e' +
+        '\\x3ca class\\x3d\\x22ns-x-e-23\\x22 data-asoch-targets\\x3d\\x22ad0,btnClk\\x22\\x3e열기\\x3c/a\\x3e',
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_HTMLTPL' });
+    expect(detail.headline).toBe('일반 치약의 20배 효과'); // <br> → 공백
+    expect(detail.description).toBe('온 가족 칫솔 닿는 치약 쓰시나요?');
+    expect(detail.ctaText).toBe('열기');
+    expect(detail.landingUrl).toBe('https://parodex.kr/product?no=13'); // adurl= 디코드
+    expect(detail.logoUrl).toBe('https://tpc.googlesyndication.com/simgad/LOGO'); // 정사각 소형만, 쿼리 제거
+  });
+
   it('도메인 검색은 미지원(예외)', async () => {
     const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(), get: vi.fn() });
     await expect(src.searchAdvertisersByDomain({ domain: 'x.com' })).rejects.toThrow(/회사명 검색/);

@@ -45,6 +45,40 @@ function extractLogo(html) {
   if (v && (/^data:image\//.test(v) || /^https?:\/\//.test(v))) return v;
   return undefined;
 }
+// ⚠️ content.js 템플릿은 두 종류(실측): adData JSON(→ fieldValue)과 **HTML 마크업 템플릿**
+// (creativeType 46 이미지 레이아웃 — adData 없이 완성 HTML). 후자는 title/body 클래스 div 의
+// <a> 텍스트, data-asoch-targets="…btnClk…" 앵커(CTA), adurl= 파라미터(랜딩),
+// 정사각 소형(w=h≤200) background-image simgad(로고)에서 추출한다.
+function componentsFromHtmlTemplate(rawHtml) {
+  const d = unescapeHex(rawHtml);
+  const clean = (s) =>
+    s
+      ? s.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() || undefined
+      : undefined;
+  const pick = (cls) => {
+    const m = d.match(new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"[^>]*>\\s*<a[^>]*>([\\s\\S]*?)</a>`));
+    return clean(m && m[1]);
+  };
+  const out = { headline: pick('title'), description: pick('body') };
+  for (const m of d.matchAll(/<a[^>]*data-asoch-targets="[^"]*btnClk[^"]*"[^>]*>([\s\S]*?)<\/a>/g)) {
+    out.ctaText = clean(m[1]);
+    if (out.ctaText) break;
+  }
+  const adurl = (d.match(/adurl=([^&"'\s]+)/) || [])[1];
+  if (adurl) {
+    try {
+      const u = decodeURIComponent(adurl);
+      if (/^https?:\/\//i.test(u)) out.landingUrl = u;
+    } catch {}
+  }
+  for (const m of d.matchAll(/background-image:url\((https?:\/\/[^)]*\/simgad\/[^)?]+)\?w=(\d+)&h=(\d+)/g)) {
+    if (Number(m[2]) === Number(m[3]) && Number(m[2]) <= 200) {
+      out.logoUrl = m[1]; // 쿼리 제거 → 원본 해상도
+      break;
+    }
+  }
+  return out;
+}
 function extractLandingUrl(html) {
   const dest = fieldValue(html, 'destination_url');
   if (dest && /^https?:\/\//i.test(dest)) return dest;
@@ -258,6 +292,15 @@ async function getDetail(advertiserId, creativeId) {
     description = description || fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text');
     ctaText = ctaText || fieldValue(r.text, 'callToActionText');
     logoUrl = logoUrl || extractLogo(r.text);
+    // adData JSON 이 없는 HTML 마크업 템플릿이면 마크업 파서로 폴백
+    if (!headline || !description || !ctaText || !landingUrl || !logoUrl) {
+      const t = componentsFromHtmlTemplate(r.text);
+      headline = headline || t.headline;
+      description = description || t.description;
+      ctaText = ctaText || t.ctaText;
+      landingUrl = landingUrl || t.landingUrl;
+      logoUrl = logoUrl || t.logoUrl;
+    }
     if (headline || description) break;
   }
   // raw 는 그대로 보존해 저장한다(프로젝트 규칙) — 형식이 바뀌거나 추출이 실패했을 때
