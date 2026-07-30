@@ -37,6 +37,8 @@ export interface AdCard {
   thumbnailPath: string | null;
   imageUrl: string | null;
   headline: string | null;
+  description: string | null;
+  ctaText: string | null;
   landingUrl: string | null;
   latestViews: number | null;
   latestLikes: number | null;
@@ -108,6 +110,8 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
       thumbnailPath: ads.thumbnailPath,
       imageUrl: ads.imageUrl,
       headline: ads.headline,
+      description: ads.description,
+      ctaText: ads.ctaText,
       landingUrl: ads.landingUrl,
       latestViews: latestViewsSql,
       latestLikes: latestLikesSql,
@@ -167,6 +171,8 @@ export async function bestAds(period: BestPeriod, minViews = 0, from?: string, t
       thumbnailPath: ads.thumbnailPath,
       imageUrl: ads.imageUrl,
       headline: ads.headline,
+      description: ads.description,
+      ctaText: ads.ctaText,
       landingUrl: ads.landingUrl,
       latestViews: latestViewsSql,
       latestLikes: latestLikesSql,
@@ -209,6 +215,8 @@ export async function getAd(id: string): Promise<AdDetailView | null> {
       thumbnailPath: ads.thumbnailPath,
       imageUrl: ads.imageUrl,
       headline: ads.headline,
+      description: ads.description,
+      ctaText: ads.ctaText,
       landingUrl: ads.landingUrl,
       landingDomain: ads.landingDomain,
       videoUrl: ads.videoUrl,

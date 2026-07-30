@@ -88,6 +88,20 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.videoUrl).toBe('https://www.youtube.com/embed/I6J_lQd3Qy0'); // 썸네일에서 YouTube ID
   });
 
+  it('getAdDetail: 광고 구성요소(headline/description/ctaText) 추출 — 완성 광고 재현용', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    const get = vi.fn(
+      async () =>
+        'google_template_data: {\\x27adData\\x27: [{\\x27headline\\x27: \\x27일반 치약의 20배 효과\\x27,' +
+        '\\x27description\\x27: \\x27온 가족 칫솔 닿는 치약 쓰시나요?\\x27,\\x27callToActionText\\x27: \\x27열기\\x27}]}',
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR' });
+    expect(detail.headline).toBe('일반 치약의 20배 효과');
+    expect(detail.description).toBe('온 가족 칫솔 닿는 치약 쓰시나요?');
+    expect(detail.ctaText).toBe('열기');
+  });
+
   it('getAdDetail: destination_url 없고 visible_url 이 도메인만이면 https 보정', async () => {
     const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
     const get = vi.fn(async () => "\\x27visible_url\\x27: \\x27sonusair.kr\\x27");

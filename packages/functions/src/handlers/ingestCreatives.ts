@@ -12,6 +12,8 @@ export interface IngestAd {
   youtubeVideoId?: string; // 확장이 직접 파싱해 보낼 수도 있음
   imageUrl?: string; // 이미지 광고 크리에이티브 URL
   headline?: string; // 광고 문구
+  description?: string; // 부제/설명
+  ctaText?: string; // CTA 버튼 문구
   landingUrl?: string;
   raw?: unknown;
 }
@@ -103,6 +105,8 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
         // 서버측 재검증: 확장이 (옛 코드로) 로고/HTML URL 을 보내도 여기서 거른다(안전망).
         imageUrl: ad.imageUrl && isRealCreativeUrl(ad.imageUrl) ? ad.imageUrl : null,
         headline: ad.headline ?? null,
+        description: ad.description ?? null,
+        ctaText: ad.ctaText ?? null,
         thumbnailPath: null, // 대시보드는 youtube_video_id 로 썸네일 URL 유도 (Blob 불필요)
         landingUrl: ad.landingUrl ?? null,
         landingDomain: landingDomain(ad.landingUrl),

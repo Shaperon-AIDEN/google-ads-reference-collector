@@ -24,7 +24,10 @@ export interface AdDetail {
   videoUrl?: string; // video_link (youtube embed URL 등)
   imageUrl?: string; // image (이미지 광고 크리에이티브 URL)
   landingUrl?: string; // visible_link
+  // 광고 구성요소 — 대시보드에서 완성 광고를 재현하는 데 사용
   headline?: string;
+  description?: string;
+  ctaText?: string; // callToActionText (예: "자세히 알아보기", "열기")
   channelName?: string;
   raw: unknown; // 원본 응답 verbatim → ads.raw (jsonb)
 }

@@ -230,27 +230,28 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     let imageUrl: string | undefined = imageFromVariations(variations);
     let landingUrl: string | undefined;
     let headline: string | undefined;
+    let description: string | undefined;
+    let ctaText: string | undefined;
     if (previewUrl) {
-      // 비디오·텍스트 광고: 미리보기 content.js 를 받아 YouTube ID·랜딩·헤드라인 추출
+      // 비디오·텍스트 광고: 미리보기 content.js 를 받아 YouTube ID·랜딩·구성요소 추출
       try {
         const html = await this.t.get(previewUrl);
         const ytId = extractYouTubeId(html);
         if (ytId) videoUrl = `https://www.youtube.com/embed/${ytId}`;
-        else if (!imageUrl) imageUrl = extractImageUrl(html); // 폴백
+        // 비디오라도 배너 이미지가 따로 있으면 확보한다(discover 레이아웃은 배너+텍스트 조합)
+        if (!imageUrl) imageUrl = extractImageUrl(html);
         landingUrl = extractLandingUrl(html); // visible_url → 랜딩. landing_domain 은 핸들러가 계산
-        // 광고 문구 — google_template_data 의 headline, 없으면 longHeadline/description/body_text 폴백
-        headline =
-          fieldValue(html, 'headline') ??
-          fieldValue(html, 'longHeadline') ??
-          fieldValue(html, 'description') ??
-          fieldValue(html, 'body_text');
+        // 광고 구성요소 — 대시보드에서 완성 광고를 재현하는 데 사용
+        headline = fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline');
+        description = fieldValue(html, 'description') ?? fieldValue(html, 'body_text');
+        ctaText = fieldValue(html, 'callToActionText');
       } catch {
         // 미리보기 fetch 실패는 상세 저장을 막지 않는다
       }
     }
 
     return {
-      detail: { creativeId: p.creativeId, videoUrl, imageUrl, landingUrl, headline, raw: json },
+      detail: { creativeId: p.creativeId, videoUrl, imageUrl, landingUrl, headline, description, ctaText, raw: json },
       apiCalls: 0,
     };
   }

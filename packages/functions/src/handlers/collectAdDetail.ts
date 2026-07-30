@@ -78,6 +78,8 @@ export async function collectAdDetail(deps: HandlerDeps, msg: NewAdQueueMessage)
     publishedAt: stats?.publishedAt ? new Date(stats.publishedAt) : null,
     imageUrl: detail.imageUrl,
     headline: detail.headline,
+    description: detail.description,
+    ctaText: detail.ctaText,
     thumbnailPath,
     landingUrl: detail.landingUrl,
     landingDomain: landingDomain(detail.landingUrl),

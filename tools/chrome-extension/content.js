@@ -224,22 +224,22 @@ async function getDetail(advertiserId, creativeId) {
   const previewUrl = variations[0] && variations[0]['1'] && variations[0]['1']['4'];
   // 이미지 광고는 응답에서 바로 추출(미리보기 fetch 불필요), 비디오·텍스트는 미리보기 content.js
   let imageUrl = imageFromVariations(variations);
-  let videoUrl, landingUrl, headline, youtubeVideoId;
+  let videoUrl, landingUrl, headline, description, ctaText, youtubeVideoId;
   if (previewUrl) {
     const r = await bg({ type: 'fetchText', url: previewUrl });
     if (r && r.ok && r.text) {
       youtubeVideoId = extractYouTubeId(r.text);
       if (youtubeVideoId) videoUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
-      else if (!imageUrl) imageUrl = await pickBestImage(imageCandidatesFromPreview(r.text)); // 크기로 로고 제외
+      // 비디오라도 배너 이미지가 따로 있으면 확보(discover 레이아웃 = 배너+텍스트 조합)
+      if (!imageUrl) imageUrl = await pickBestImage(imageCandidatesFromPreview(r.text)); // 크기로 로고 제외
       landingUrl = extractLandingUrl(r.text);
-      // 광고 문구 — google_template_data 의 headline, 없으면 description/longHeadline 폴백
-      headline =
-        fieldValue(r.text, 'headline') ??
-        fieldValue(r.text, 'longHeadline') ??
-        fieldValue(r.text, 'description');
+      // 광고 구성요소 — 대시보드에서 완성 광고를 재현하는 데 사용
+      headline = fieldValue(r.text, 'headline') ?? fieldValue(r.text, 'longHeadline');
+      description = fieldValue(r.text, 'description') ?? fieldValue(r.text, 'body_text');
+      ctaText = fieldValue(r.text, 'callToActionText');
     }
   }
-  return { youtubeVideoId, videoUrl, imageUrl, landingUrl, headline };
+  return { youtubeVideoId, videoUrl, imageUrl, landingUrl, headline, description, ctaText };
 }
 
 async function collectAdvertiser(advertiserId, cfg) {
