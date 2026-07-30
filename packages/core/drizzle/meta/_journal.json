@@ -36,6 +36,13 @@
       "when": 1785392502404,
       "tag": "0004_plain_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785395161027,
+      "tag": "0005_harsh_bloodstrike",
+      "breakpoints": true
     }
   ]
 }

@@ -192,6 +192,44 @@ export async function bestAds(period: BestPeriod, minViews = 0, from?: string, t
   }));
 }
 
+/** 광고 "대안"(variation) — 대안별 사이즈·문구·스크린샷 유무 */
+export interface AdVariationView {
+  id: string;
+  idx: number;
+  width: number | null;
+  height: number | null;
+  headline: string | null;
+  description: string | null;
+  ctaText: string | null;
+  logoUrl: string | null;
+  imageUrl: string | null;
+  landingUrl: string | null;
+  hasScreenshot: boolean;
+}
+
+/** 광고의 대안 목록 (스크린샷 바이너리는 제외 — /api/variations/[id]/screenshot 로 스트리밍) */
+export async function getAdVariations(adId: string): Promise<AdVariationView[]> {
+  const v = schema.adVariations;
+  const rows = await db()
+    .select({
+      id: v.id,
+      idx: v.idx,
+      width: v.width,
+      height: v.height,
+      headline: v.headline,
+      description: v.description,
+      ctaText: v.ctaText,
+      logoUrl: v.logoUrl,
+      imageUrl: v.imageUrl,
+      landingUrl: v.landingUrl,
+      hasScreenshot: sql<boolean>`(${v.screenshot} is not null)`,
+    })
+    .from(v)
+    .where(eq(v.adId, adId))
+    .orderBy(v.idx);
+  return rows;
+}
+
 export interface AdDetailView extends AdCard {
   landingDomain: string | null;
   videoUrl: string | null;

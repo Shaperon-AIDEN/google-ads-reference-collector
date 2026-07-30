@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { ingestBase: 'http://localhost:7071/api', num: 40, delayMs: 1200, region: 'KR', flushEvery: 5 };
+const DEFAULTS = { ingestBase: 'http://localhost:7071/api', num: 40, delayMs: 3000, region: 'KR', flushEvery: 5, renderWaitMs: 6000 };
 
 function log(msg) {
   const el = $('log');
@@ -20,9 +20,10 @@ function readCfg() {
   const cfg = {
     ingestBase: $('ingestBase').value.trim() || DEFAULTS.ingestBase,
     num: Number($('num').value) || 40,
-    delayMs: Number($('delayMs').value) || 1200,
+    delayMs: Number($('delayMs').value) || 3000,
     region: $('region').value.trim() || 'KR',
     flushEvery: Number($('flushEvery').value) || 5,
+    renderWaitMs: DEFAULTS.renderWaitMs,
   };
   chrome.storage.local.set({ cfg });
   return cfg;
@@ -79,6 +80,15 @@ $('start').addEventListener('click', async () => {
   log(`수집 시작: ${ids.length}개 광고주 (간격 ${cfg.delayMs}ms)`);
   chrome.tabs.sendMessage(tab.id, { type: 'collect', advertiserIds: ids, cfg }, () => {
     if (chrome.runtime.lastError) log('오류: ' + chrome.runtime.lastError.message + ' (탭 새로고침 후 재시도)');
+  });
+});
+
+// 스크린샷 수집 — background 가 광고 페이지를 하나씩 열어 대안별 캡처 (팝업이 닫혀도 진행)
+$('screenshots').addEventListener('click', () => {
+  const cfg = readCfg();
+  chrome.runtime.sendMessage({ type: 'screenshotRun', cfg }, (res) => {
+    if (chrome.runtime.lastError) return log('오류: ' + chrome.runtime.lastError.message);
+    if (res && res.started) log('스크린샷 수집 시작 — 탭이 자동으로 열리고 닫힙니다. 캡처 중 창을 화면에 두세요.');
   });
 });
 

@@ -15,6 +15,19 @@ export interface AdListItem {
   detailsLink?: string; // details_link (투명성 센터 원본)
 }
 
+/** 광고 대안 1건 — 대안별 사이즈·구성요소 */
+export interface AdVariationDetail {
+  idx: number; // variation 순서 (0부터)
+  width?: number; // 광고 단위 크기 (previewMetadata)
+  height?: number;
+  headline?: string;
+  description?: string;
+  ctaText?: string;
+  logoUrl?: string;
+  imageUrl?: string;
+  landingUrl?: string;
+}
+
 /**
  * 상세 엔드포인트(google_ads_transparency_center_ad_details) 결과.
  * 실측 결과 영상·랜딩·헤드라인만 제공하며 format/dates 는 없다(목록에서 가져옴).
@@ -29,6 +42,11 @@ export interface AdDetail {
   description?: string;
   ctaText?: string; // callToActionText (예: "자세히 알아보기", "열기")
   logoUrl?: string; // 브랜드 로고 (http URL 또는 base64 데이터 URI)
+  /**
+   * 광고 "대안"(variation) — 투명성 센터 상세의 대안 카드들. 대안마다 사이즈·문구·CTA 가 다르다.
+   * width/height 는 미리보기 previewMetadata 실측값.
+   */
+  variations?: AdVariationDetail[];
   channelName?: string;
   raw: unknown; // 원본 응답 verbatim → ads.raw (jsonb)
 }
@@ -56,6 +74,8 @@ export interface SearchAdvertisersParams {
 export interface GetAdDetailParams {
   advertiserId: string;
   creativeId: string;
+  /** 목록에서 확보한 format — 크롤 소스가 대안 수집 범위를 정하는 데 쓴다(비디오=조기 중단). */
+  format?: AdFormat;
 }
 
 /**

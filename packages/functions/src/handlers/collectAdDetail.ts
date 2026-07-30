@@ -31,6 +31,7 @@ export async function collectAdDetail(deps: HandlerDeps, msg: NewAdQueueMessage)
   const { detail, apiCalls } = await ads.getAdDetail({
     advertiserId: msg.advertiserId,
     creativeId: msg.creativeId,
+    format: msg.format, // 크롤 소스가 대안 수집 범위를 정함 (비디오=조기 중단, 이미지·텍스트=전체)
   });
   quota.record(apiCalls);
 
@@ -88,6 +89,22 @@ export async function collectAdDetail(deps: HandlerDeps, msg: NewAdQueueMessage)
     raw: detail.raw,
     collectedAt: new Date(),
   });
+
+  // 대안(variation) 보존 — 대안마다 사이즈·문구·CTA 가 다르다 (ad_id, idx 멱등 upsert)
+  for (const v of detail.variations ?? []) {
+    await repos.adVariations.upsert({
+      adId: saved.id,
+      idx: v.idx,
+      width: v.width ?? null,
+      height: v.height ?? null,
+      headline: v.headline ?? null,
+      description: v.description ?? null,
+      ctaText: v.ctaText ?? null,
+      logoUrl: v.logoUrl ?? null,
+      imageUrl: v.imageUrl ?? null,
+      landingUrl: v.landingUrl ?? null,
+    });
+  }
 
   // 수집 시점에 조회수 스냅샷도 즉시 적재 (일별 Timer 를 기다리지 않고 즉시 표시).
   if (stats) {

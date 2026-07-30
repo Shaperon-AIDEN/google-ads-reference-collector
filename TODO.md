@@ -146,6 +146,13 @@
 - [x] **브라우저 확장 수집(봇 차단 회피)** — 서버 직접 크롤이 Google `/sorry`(비정상 트래픽)에 막혀, 실제 사용자 Chrome 의 first-party 요청으로 수집하는 MV3 확장(`tools/chrome-extension/`) 구현. 백엔드 `POST /api/ingest`·`/api/known`·`GET /api/advertisers`(CORS), `ingestCreatives` 핸들러(멱등 upsert + YouTube 스냅샷, 비디오만). 신규만 상세 요청·차단 감지 자동 중단. 테스트 4건
 - [x] **최신순 = 영상 게시일 기준** — 기존 최신순은 수집 시각(collectedAt) 기준이었음. YouTube `snippet.publishedAt` 을 `ads.published_at` 에 저장(수집 시 collectAdDetail·일별 collectViewCounts 백필)하고, 최신순을 `coalesce(published_at, first_shown, collected_at)` desc 로 정렬. 마이그레이션 0001, 기존 278건 백필
 
+- [x] **광고 구성요소 저장 + 완성 광고 재현** — 투명성 센터 광고 = 배너+로고+headline+description+CTA 조합. `description`·`cta_text`(0003)·`logo_url`(0004) 컬럼, content.js 추출 2계열(adData JSON `fieldValue` + **HTML 마크업 템플릿** `componentsFromHtmlTemplate`: title/body 클래스·btnClk 앵커·adurl·정사각 소형 bg 로고). 상세 페이지에서 흰 배경 광고 카드로 조합 렌더링. 미리보기 URL 은 모든 variation 에서 탐색(이미지 광고는 variation[0] 이 정적 img HTML)
+- [x] **대안(variation) 전량 수집 + 스크린샷** — `ad_variations` 테이블(0005: 대안별 width/height·문구·CTA·로고·랜딩·screenshot bytea). 이미지·텍스트는 대안 전부(≤6), 비디오는 조기 중단. 확장 "스크린샷 수집": 광고 페이지 탭을 열어 렌더 대기(~6초) 후 대안 iframe 별 captureVisibleTab+크롭 → `POST /api/screenshot` → 상세 페이지 "대안" 섹션(스크린샷=원본 픽셀, 없으면 조합 카드)
+
+## 추가 목표 (2026-07-30)
+
+- [ ] **회원가입 + 광고 즐겨찾기** — 간단한 이메일 회원가입(허용 도메인: `nizcorp.com`·`shaperon.com` 만), 로그인 사용자별 광고 즐겨찾기(목록/상세 토글·즐겨찾기 필터)
+
 ## Phase 3 — 로컬 통합 테스트 🚧 게이트
 
 - [ ] 실제 SerpApi/YouTube 키로 E2E 검증 (수집 → 저장 → 대시보드 조회)

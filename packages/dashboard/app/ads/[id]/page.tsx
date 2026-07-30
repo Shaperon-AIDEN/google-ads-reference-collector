@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import DeleteAdButton from '@/components/DeleteAdButton';
-import { getAd } from '@/lib/queries';
+import { getAd, getAdVariations, type AdVariationView } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,9 +69,61 @@ function DailyGrowthChart({
   );
 }
 
+/** 대안 1건 렌더 — 스크린샷 있으면 원본 픽셀 그대로, 없으면 실제 광고 단위 크기의 흰 카드로 조합 */
+function VariationCard({ v }: { v: AdVariationView }) {
+  const w = v.width && v.width > 0 ? Math.min(v.width, 480) : 300;
+  const label = `대안 ${v.idx + 1}${v.width && v.height ? ` · ${v.width}×${v.height}` : ''}`;
+  return (
+    <div style={{ flexShrink: 0 }}>
+      <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>{label}</div>
+      {v.hasScreenshot ? (
+        // 투명성 센터 렌더링 캡처 — 비율·레이아웃 원본 그대로
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`/api/variations/${v.id}/screenshot`}
+          alt={v.headline ?? label}
+          style={{ width: w, display: 'block', borderRadius: 10, border: '1px solid var(--border)' }}
+        />
+      ) : (
+        <div
+          style={{
+            width: w,
+            background: '#fff',
+            color: '#202124',
+            borderRadius: 10,
+            overflow: 'hidden',
+            border: '1px solid var(--border)',
+          }}
+        >
+          {v.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={v.imageUrl} alt="" style={{ display: 'block', width: '100%' }} />
+          )}
+          {(v.headline || v.description || v.ctaText) && (
+            <div style={{ padding: '14px 14px 10px' }}>
+              {v.logoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={v.logoUrl} alt="" style={{ display: 'block', maxHeight: 24, maxWidth: 120, marginBottom: 10 }} />
+              )}
+              {v.headline && <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.3, marginBottom: 8 }}>{v.headline}</div>}
+              {v.description && <div style={{ fontSize: 13, lineHeight: 1.45, color: '#5f6368' }}>{v.description}</div>}
+              {v.ctaText && (
+                <div style={{ borderTop: '1px solid #e8eaed', marginTop: 12, paddingTop: 8, textAlign: 'right', fontWeight: 600, fontSize: 13 }}>
+                  {v.ctaText} <span aria-hidden>›</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default async function AdDetailPage({ params }: { params: { id: string } }) {
   const ad = await getAd(params.id);
   if (!ad) notFound();
+  const variations = await getAdVariations(params.id);
 
   // 일별 증가량 = 해당 스냅샷 조회수 − 직전 스냅샷 조회수 (음수 방지)
   const deltas: Array<{ date: string; delta: number }> = [];
@@ -219,6 +271,18 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
           </div>
         )}
       </div>
+      )}
+
+      {/* 대안 — 한 광고의 variation 들 (대안마다 사이즈·문구·CTA 가 다르다). 가로 스크롤. */}
+      {variations.length > 0 && (
+        <>
+          <h2>대안 ({variations.length})</h2>
+          <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8, alignItems: 'flex-start' }}>
+            {variations.map((v) => (
+              <VariationCard key={v.id} v={v} />
+            ))}
+          </div>
+        </>
       )}
 
       <div className="panel">

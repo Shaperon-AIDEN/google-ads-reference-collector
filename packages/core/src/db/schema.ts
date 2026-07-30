@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  customType,
   date,
   integer,
   jsonb,
@@ -60,6 +61,35 @@ export const ads = pgTable('ads', {
   collectedAt: timestamp('collected_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// 5.2b ad_variations — 광고 "대안" (투명성 센터 상세의 variation 카드)
+// 한 광고에 여러 대안이 있고 대안마다 사이즈·문구·CTA 가 다르다. 전부 보존한다.
+// screenshot 은 확장이 투명성 센터 렌더링을 캡처한 PNG (원본 픽셀 그대로 — 비율·레이아웃 재현).
+export const adVariations = pgTable(
+  'ad_variations',
+  {
+    id: uuid('id').primaryKey().defaultRandom().notNull(),
+    adId: uuid('ad_id')
+      .notNull()
+      .references(() => ads.id, { onDelete: 'cascade' }),
+    idx: integer('idx').notNull(), // variation 순서 (0부터)
+    width: integer('width'), // 광고 단위 크기 (previewMetadata 실측)
+    height: integer('height'),
+    headline: text('headline'),
+    description: text('description'),
+    ctaText: text('cta_text'),
+    logoUrl: text('logo_url'),
+    imageUrl: text('image_url'),
+    landingUrl: text('landing_url'),
+    screenshot: customType<{ data: Buffer; driverData: Buffer }>({
+      dataType: () => 'bytea',
+    })('screenshot'),
+    collectedAt: timestamp('collected_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    adIdxUnique: unique('ad_variations_ad_idx_uq').on(t.adId, t.idx),
+  }),
+);
+
 // 5.3 ad_metrics — 일별 지표 스냅샷
 export const adMetrics = pgTable(
   'ad_metrics',
@@ -95,6 +125,8 @@ export type Competitor = typeof competitors.$inferSelect;
 export type NewCompetitor = typeof competitors.$inferInsert;
 export type Ad = typeof ads.$inferSelect;
 export type NewAd = typeof ads.$inferInsert;
+export type AdVariation = typeof adVariations.$inferSelect;
+export type NewAdVariation = typeof adVariations.$inferInsert;
 export type AdMetric = typeof adMetrics.$inferSelect;
 export type NewAdMetric = typeof adMetrics.$inferInsert;
 export type CollectionRun = typeof collectionRuns.$inferSelect;

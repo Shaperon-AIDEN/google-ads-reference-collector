@@ -5,6 +5,7 @@ import type {
   AdDetail,
   AdListItem,
   AdsSource,
+  AdVariationDetail,
   AdvertiserCandidate,
   GetAdDetailParams,
   ListAdsParams,
@@ -323,32 +324,48 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     let description: string | undefined;
     let ctaText: string | undefined;
     let logoUrl: string | undefined;
-    // 미리보기 content.js 에서 YouTube ID·랜딩·구성요소 추출.
-    // 문구를 확보하면 즉시 중단 → 대부분 1요청(기존과 동일 비용), 문구 없는 광고만 최대 3개 시도.
-    for (const previewUrl of previewUrls(variations).slice(0, 3)) {
+    const varDetails: AdVariationDetail[] = [];
+
+    // 대안(variation)별 미리보기 content.js 를 순회하며 각자의 사이즈·구성요소를 추출한다.
+    // - 비디오: 대안이 대부분 동일 영상의 사이즈 변형이라 문구 확보 시 조기 중단(요청 절약, 기존 동작).
+    // - 이미지·텍스트: 대안마다 문구·CTA·사이즈가 다르므로 **전부** 수집(최대 6개).
+    const isVideo = p.format === 'video';
+    const urls = previewUrls(variations).slice(0, isVideo ? 3 : 6);
+    for (const [idx, previewUrl] of urls.entries()) {
       try {
         const html = await this.t.get(previewUrl);
         const ytId = extractYouTubeId(html);
         if (ytId && !videoUrl) videoUrl = `https://www.youtube.com/embed/${ytId}`;
-        landingUrl ??= extractLandingUrl(html); // visible_url → 랜딩. landing_domain 은 핸들러가 계산
-        // 광고 구성요소 — 대시보드에서 완성 광고를 재현하는 데 사용
-        headline ??= fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline');
-        description ??= fieldValue(html, 'description') ?? fieldValue(html, 'body_text');
-        ctaText ??= fieldValue(html, 'callToActionText');
-        logoUrl ??= extractLogo(html);
-        // adData JSON 이 없는 HTML 마크업 템플릿이면 마크업 파서로 폴백
-        if (!headline || !description || !ctaText || !landingUrl || !logoUrl || !imageUrl) {
-          const t = componentsFromHtmlTemplate(html);
-          headline ??= t.headline;
-          description ??= t.description;
-          ctaText ??= t.ctaText;
-          landingUrl ??= t.landingUrl;
-          logoUrl ??= t.logoUrl;
-          imageUrl ??= t.imageUrl; // 배너/로고를 크기 파라미터로 구분해 선택
+
+        // 대안별 구성요소 — adData JSON 우선, 없으면 HTML 마크업 템플릿 파서
+        const t = componentsFromHtmlTemplate(html);
+        const v: AdVariationDetail = {
+          idx,
+          headline: fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline') ?? t.headline,
+          description: fieldValue(html, 'description') ?? fieldValue(html, 'body_text') ?? t.description,
+          ctaText: fieldValue(html, 'callToActionText') ?? t.ctaText,
+          logoUrl: extractLogo(html) ?? t.logoUrl,
+          imageUrl: t.imageUrl,
+          landingUrl: extractLandingUrl(html) ?? t.landingUrl,
+        };
+        // 광고 단위 크기 — previewMetadata 실측값
+        const size = html.match(/"width"\s*:\s*(\d+)\s*,\s*"height"\s*:\s*(\d+)/);
+        if (size) {
+          v.width = Number(size[1]);
+          v.height = Number(size[2]);
         }
-        // 비디오라도 배너 이미지가 따로 있으면 확보한다(discover 레이아웃은 배너+텍스트 조합)
-        if (!imageUrl) imageUrl = extractImageUrl(html);
-        if (headline || description) break;
+        varDetails.push(v);
+
+        // 광고 대표값 = 처음 확보된 값 (목록 카드·검색용)
+        headline ??= v.headline;
+        description ??= v.description;
+        ctaText ??= v.ctaText;
+        logoUrl ??= v.logoUrl;
+        landingUrl ??= v.landingUrl;
+        imageUrl ??= v.imageUrl;
+        if (!imageUrl) imageUrl = extractImageUrl(html); // 비디오 discover 배너 폴백
+
+        if (isVideo && (headline || description)) break;
       } catch {
         // 개별 미리보기 실패는 상세 저장을 막지 않는다 (다음 variation 시도)
       }
@@ -364,6 +381,7 @@ export class TransparencyCrawlAdsSource implements AdsSource {
         description,
         ctaText,
         logoUrl,
+        variations: varDetails.length ? varDetails : undefined,
         raw: json,
       },
       apiCalls: 0,
