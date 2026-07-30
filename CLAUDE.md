@@ -94,7 +94,9 @@
   - `crawl` (무료·비공식·실험적): `TransparencyCrawlAdsSource`. 투명성 센터 내부 RPC 직접 호출(curl).
     - 목록: `SearchService/SearchCreatives`, req `{"2":n,"3":{"12":{"1":"","2":true},"13":{"1":[advertiserId]}},"7":{"1":1,"2":0,"3":region}}`, 페이지네이션=req field `4`(=응답 field `2` 토큰). 응답 item: `2`=creativeId, `4`=format(1/2/3), `6`/`7`=Unix 게재일.
     - 상세: `LookupService/GetCreativeById` → 응답 `['1']['5']`=variation 배열. **비디오·텍스트**는 `variation['1']['4']`=미리보기 `content.js` URL → fetch → YouTube ID 추출(`ytimg.com/vi/<id>` + `video_id` 필드). **이미지**는 `variation['3']['2']` 에 `<img src="…/archive/simgad/…">` HTML 이 **응답에 직접** 포함(미리보기 fetch 불필요) → src 추출. **실제 광고 크리에이티브는 `/archive/simgad/` 경로**이고, archive 없는 `/simgad/` 는 광고주 **로고**(크기 무관 — 2084² 대형 로고도 존재하므로 크기로 못 거름), `/pagead/` 는 HTML 자산 → `isRealCreativeUrl` 이 셋을 구분해 로고·자산을 제외한다. format=image 라도 discover/HTML 광고는 정적 이미지가 없어 image_url 없음(정상).
-    - 랜딩: content.js 의 `destination_url`(전체 URL) 우선, 없으면 `visible_url`(도메인은 https 보정). **단 content.js 렌더가 비결정적이라 랜딩은 best-effort(일부만 확보)**. `GetCreativeById` 응답엔 랜딩 필드 없음.
+    - 랜딩·문구: content.js 의 `destination_url`(전체 URL) 우선, 없으면 `visible_url`(도메인은 https 보정). 문구는 `headline`→`longHeadline`→`description` 폴백. `GetCreativeById` 응답엔 랜딩 필드 없음.
+    - **⚠️ content.js 필드명 따옴표 유무가 섞여 있다**(실측): adData 최상위는 `destination_url: \x27값\x27`(**무따옴표**), `google_template_data` 내부는 `\x27headline\x27: \x27값\x27`(따옴표). `fieldValue` 정규식이 **양쪽을 모두** 잡아야 한다 — 예전엔 무따옴표를 놓쳐 랜딩 URL 확보율이 낮았다("best-effort"의 원인).
+    - **content.js 는 정적 텍스트다** — fetch 응답이 즉시 완전하므로 "렌더링 대기"는 불필요(브라우저의 시각적 iframe 렌더 완료와 무관). 필요한 값(YouTube ID·이미지·랜딩·문구)은 모두 텍스트에서 정규식으로 추출된다. discover 레이아웃 비디오 광고는 `thumbnail`/`video_videoId` 에 YouTube ID 가 들어있다.
     - 조회수: 크롤과 무관 — YouTube Data API(무료)로 수집(youtube_video_id 있으면). 투명성 센터는 상업광고 조회수 미제공.
     - **제한**: 랜딩 URL 불안정(best-effort), 도메인 검색 미지원(회사명 검색 사용). `apiCalls=0`(쿼터 미소모).
     - **리스크**: 비공식·형식 변동 시 조용히 빈 결과, 대량 시 봇 차단 가능, ToS. 깨지면 `ADS_SOURCE=serpapi` 로 롤백.

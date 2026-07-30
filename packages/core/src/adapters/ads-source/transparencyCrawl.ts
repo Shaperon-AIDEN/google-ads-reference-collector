@@ -96,10 +96,14 @@ function unescapeHex(s: string): string {
   return s.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 }
 
-/** content.js 미리보기에서 특정 필드 값 추출 (이스케이프/평문 형식 모두) */
+/**
+ * content.js 미리보기에서 특정 필드 값 추출 (이스케이프/평문 형식 모두).
+ * ⚠️ 실측상 필드명 따옴표 유무가 섞여 있다 — adData 최상위는 `destination_url: \x27값\x27`(무따옴표),
+ * google_template_data 내부는 `\x27headline\x27: \x27값\x27`(따옴표). 둘 다 잡아야 랜딩 URL 이 확보된다.
+ */
 function fieldValue(html: string, field: string): string | undefined {
-  let m = html.match(new RegExp(`${field}\\\\x27\\s*:\\s*\\\\x27(.*?)\\\\x27`));
-  if (!m) m = html.match(new RegExp(`["']${field}["']\\s*:\\s*["']([^"']+)["']`));
+  let m = html.match(new RegExp(`(?:\\\\x27|["'])?${field}(?:\\\\x27|["'])?\\s*:\\s*\\\\x27(.*?)\\\\x27`));
+  if (!m) m = html.match(new RegExp(`["']?${field}["']?\\s*:\\s*["']([^"']+)["']`));
   return m?.[1] ? unescapeHex(m[1]).trim() : undefined;
 }
 
@@ -234,7 +238,12 @@ export class TransparencyCrawlAdsSource implements AdsSource {
         if (ytId) videoUrl = `https://www.youtube.com/embed/${ytId}`;
         else if (!imageUrl) imageUrl = extractImageUrl(html); // 폴백
         landingUrl = extractLandingUrl(html); // visible_url → 랜딩. landing_domain 은 핸들러가 계산
-        headline = fieldValue(html, 'headline') ?? fieldValue(html, 'body_text');
+        // 광고 문구 — google_template_data 의 headline, 없으면 longHeadline/description/body_text 폴백
+        headline =
+          fieldValue(html, 'headline') ??
+          fieldValue(html, 'longHeadline') ??
+          fieldValue(html, 'description') ??
+          fieldValue(html, 'body_text');
       } catch {
         // 미리보기 fetch 실패는 상세 저장을 막지 않는다
       }

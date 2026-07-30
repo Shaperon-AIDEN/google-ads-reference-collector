@@ -73,6 +73,21 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.landingUrl).toBe('https://sonusair.kr/product?a=1');
   });
 
+  it('getAdDetail: 실측 형태 — 필드명 무따옴표(destination_url:)도 랜딩·문구 추출', async () => {
+    // 실측 content.js: adData 최상위는 필드명 무따옴표, google_template_data 내부는 \x27 로 감쌈
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    const get = vi.fn(
+      async () =>
+        'var adData = {visible_url: \\x27parodex.kr\\x27,destination_url: \\x27https://parodex.kr/product/detail.html?product_no\\x3d13\\x27,' +
+        'google_template_data: {\\x27adData\\x27: [{\\x27headline\\x27: \\x27앰플 세럼 치약\\x27,\\x27thumbnail\\x27: \\x27https://i.ytimg.com/vi/I6J_lQd3Qy0/hqdefault.jpg\\x27}]}};',
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR' });
+    expect(detail.landingUrl).toBe('https://parodex.kr/product/detail.html?product_no=13'); // 무따옴표 필드명
+    expect(detail.headline).toBe('앰플 세럼 치약');
+    expect(detail.videoUrl).toBe('https://www.youtube.com/embed/I6J_lQd3Qy0'); // 썸네일에서 YouTube ID
+  });
+
   it('getAdDetail: destination_url 없고 visible_url 이 도메인만이면 https 보정', async () => {
     const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
     const get = vi.fn(async () => "\\x27visible_url\\x27: \\x27sonusair.kr\\x27");
