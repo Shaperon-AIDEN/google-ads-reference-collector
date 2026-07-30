@@ -57,7 +57,8 @@ function progress(message) {
   } catch {}
 }
 
-// 전체 탭 캡처(PNG dataUrl)를 대안 iframe 영역으로 크롭 (devicePixelRatio 보정)
+// 전체 탭 캡처(PNG dataUrl)를 대안 iframe 영역으로 크롭 (devicePixelRatio 보정).
+// blank=단색(아직 렌더 안 된 빈 영역) 여부를 함께 반환 — 호출부가 재시도/스킵 판단.
 async function cropShot(dataUrl, rect, dpr) {
   const blob = await (await fetch(dataUrl)).blob();
   const bmp = await createImageBitmap(blob);
@@ -67,12 +68,22 @@ async function cropShot(dataUrl, rect, dpr) {
   const sh = Math.min(bmp.height - sy, Math.round(rect.h * dpr));
   if (sw <= 0 || sh <= 0) throw new Error('빈 캡처 영역');
   const canvas = new OffscreenCanvas(sw, sh);
-  canvas.getContext('2d').drawImage(bmp, sx, sy, sw, sh, 0, 0, sw, sh);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bmp, sx, sy, sw, sh, 0, 0, sw, sh);
+  // 단색 검사 — 픽셀을 듬성듬성 샘플링해 첫 픽셀과 전부 비슷하면 빈 캡처로 판정
+  const d = ctx.getImageData(0, 0, sw, sh).data;
+  let blank = true;
+  for (let i = 0; i < d.length; i += 397 * 4) {
+    if (Math.abs(d[i] - d[0]) > 8 || Math.abs(d[i + 1] - d[1]) > 8 || Math.abs(d[i + 2] - d[2]) > 8) {
+      blank = false;
+      break;
+    }
+  }
   const png = await canvas.convertToBlob({ type: 'image/png' });
   const buf = new Uint8Array(await png.arrayBuffer());
   let bin = '';
   for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-  return 'data:image/png;base64,' + btoa(bin);
+  return { dataUrl: 'data:image/png;base64,' + btoa(bin), blank };
 }
 
 // content script 가 준비될 때까지 재시도하며 메시지 전송
@@ -96,13 +107,22 @@ async function captureCreative(advertiserId, creativeId, cfg) {
     const info = await sendToTab(tab.id, { type: 'waitVariations', renderWaitMs: cfg.renderWaitMs || 6000 });
     if (!info || !info.ok) return { creativeId, error: (info && info.error) || '대안 iframe 없음' };
     for (let i = 0; i < info.count; i++) {
-      const r = await sendToTab(tab.id, { type: 'focusVariation', pos: i }, 4);
-      if (!r || !r.ok) continue;
-      await sleepBg(400); // 스크롤 정착 대기
       try {
-        const full = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
-        const png = await cropShot(full, r.rect, r.dpr);
-        shots.push({ idx: r.idx, width: r.width, height: r.height, dataUrl: png });
+        // 빈 캡처(단색)면 렌더 미완료 → 4초 더 기다렸다 재캡처 (최대 3회). 끝내 비면 저장 안 함.
+        let shot;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const r = await sendToTab(tab.id, { type: 'focusVariation', pos: i }, 4);
+          if (!r || !r.ok) break;
+          const full = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+          const c = await cropShot(full, r.rect, r.dpr);
+          if (!c.blank) {
+            shot = { idx: r.idx, width: r.width, height: r.height, dataUrl: c.dataUrl };
+            break;
+          }
+          progress(`  대안 ${i}: 빈 캡처 — ${attempt < 2 ? '4초 후 재시도' : '스킵'}`);
+          await sleepBg(4000);
+        }
+        if (shot) shots.push(shot);
       } catch (e) {
         progress(`  대안 ${i} 캡처 실패: ${e}`);
       }
