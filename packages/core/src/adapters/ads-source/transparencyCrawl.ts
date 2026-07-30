@@ -360,6 +360,9 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     // - 비디오: 대안이 대부분 동일 영상의 사이즈 변형이라 문구 확보 시 조기 중단(요청 절약, 기존 동작).
     // - 이미지·텍스트: 대안마다 문구·CTA·사이즈가 다르므로 **전부** 수집(최대 6개).
     const isVideo = p.format === 'video';
+    // 이미지·텍스트: 상세(RPC) 후 CRAWL_DETAIL_WAIT_MS(기본 6000) 대기하고 미리보기 수집 (0=대기 없음)
+    const detailWaitMs = Number(process.env.CRAWL_DETAIL_WAIT_MS ?? 6000);
+    if (!isVideo && detailWaitMs > 0) await new Promise((r) => setTimeout(r, detailWaitMs));
     const urls = previewUrls(variations).slice(0, isVideo ? 3 : 6);
     for (const [idx, previewUrl] of urls.entries()) {
       try {

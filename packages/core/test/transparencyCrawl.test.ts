@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TransparencyCrawlAdsSource, type CrawlTransport } from '../src/adapters/ads-source/transparencyCrawl.js';
 
+// 테스트에선 상세 대기(기본 6000ms)를 끈다 — 대기 로직 자체는 값 주입으로 즉시 검증
+process.env.CRAWL_DETAIL_WAIT_MS = '0';
+
 describe('TransparencyCrawlAdsSource', () => {
   it('listAds: SearchCreatives 응답을 매핑 + 페이지네이션 토큰', async () => {
     // 실측 응답 구조 재현 (item: 1=advertiserId, 2=creativeId, 4=format, 6/7=unix dates)
@@ -326,6 +329,23 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.landingUrl).toBe('https://www.basetune.co.kr/');
     expect(detail.imageUrl).toBeUndefined(); // 이 유형은 크리에이티브 이미지가 원래 없다
     expect(detail.variations![0]).toMatchObject({ width: 380, height: 320 });
+  });
+
+  it('getAdDetail: 이미지·텍스트는 상세 후 CRAWL_DETAIL_WAIT_MS 만큼 대기하고 미리보기 수집', async () => {
+    process.env.CRAWL_DETAIL_WAIT_MS = '120';
+    try {
+      const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+      const get = vi.fn(async () => 'no data');
+      const src = new TransparencyCrawlAdsSource({ rpc, get });
+      const t0 = Date.now();
+      await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR', format: 'image' });
+      expect(Date.now() - t0).toBeGreaterThanOrEqual(110); // 대기 적용됨
+      const t1 = Date.now();
+      await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR', format: 'video' });
+      expect(Date.now() - t1).toBeLessThan(100); // 비디오는 대기 없음
+    } finally {
+      process.env.CRAWL_DETAIL_WAIT_MS = '0';
+    }
   });
 
   it('도메인 검색은 미지원(예외)', async () => {
