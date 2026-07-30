@@ -20,7 +20,11 @@ export function isFormatAllowed(format: AdFormat, scope: 'video' | 'all'): boole
  * URL 로는 구분 불가하고 **크기로만** 판별된다(확장이 픽셀 측정으로 처리). 여기선 명백한 비이미지만 거른다.
  */
 export function isRealCreativeUrl(u: string): boolean {
-  return /\/simgad\/|googleusercontent\.com\//.test(u) && !/\/pagead\/|\/sadbundle\/|discover_ads/.test(u);
+  // encrypted-tbn*.gstatic.com/shopping = 쇼핑(PLA) 광고의 상품 이미지 (쿼리 q=tbn:… 이 식별자)
+  return (
+    /\/simgad\/|googleusercontent\.com\/|encrypted-tbn\d*\.gstatic\.com\/(?:shopping|images)/.test(u) &&
+    !/\/pagead\/|\/sadbundle\/|discover_ads/.test(u)
+  );
 }
 
 /**

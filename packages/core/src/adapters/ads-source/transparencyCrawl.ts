@@ -144,8 +144,11 @@ function componentsFromHtmlTemplate(rawHtml: string): {
       : undefined;
   const pick = (cls: string) =>
     clean(d.match(new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"[^>]*>\\s*<a[^>]*>([\\s\\S]*?)</a>`))?.[1]);
+  // 쇼핑(PLA) 마크업 변형: 상품명이 <a> 가 아니라 product-name div 안 <span> 에 있다
+  const pickBlock = (cls: string) =>
+    clean(d.match(new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"[^>]*>([\\s\\S]{0,400}?)</div>`))?.[1]);
 
-  const headline = pick('title');
+  const headline = pick('title') ?? pickBlock('product-name');
   const description = pick('body');
 
   let ctaText: string | undefined;
@@ -179,6 +182,11 @@ function componentsFromHtmlTemplate(rawHtml: string): {
       imageUrl = m[1];
     }
   }
+  // 쇼핑(PLA) 마크업 변형: 상품 이미지가 encrypted-tbn 배경이미지로 온다 (쿼리 q=tbn:… 이 식별자 — 유지)
+  if (!imageUrl) {
+    const tbn = d.match(/background-image:url\((https:\/\/encrypted-tbn[^)\s"']+)\)/);
+    if (tbn) imageUrl = tbn[1];
+  }
 
   return { headline, description, ctaText, landingUrl, logoUrl, imageUrl };
 }
@@ -211,6 +219,28 @@ function componentsFromSearchAdTemplate(rawHtml: string): {
   if (/^https?:\/\//i.test(visible)) landingUrl = visible;
   else if (/^[a-z0-9.-]+\.[a-z]{2,}/i.test(visible)) landingUrl = `https://${visible}`;
   return { headline, description, landingUrl };
+}
+
+/**
+ * ⚠️ content.js 템플릿 네 번째 유형(실측): **쇼핑 광고(PLA)**. adData·마크업·검색형 어디에도
+ * 없고, `<c-wiz … data-p="%.@.[&quot;<상품이미지>&quot;,&quot;<상품명>&quot;,&quot;<판매자>&quot;,…]">`
+ * 에 들어있다. 상품 이미지는 `encrypted-tbn*.gstatic.com/shopping?q=tbn:…` (쿼리가 식별자 — 제거 금지).
+ */
+function componentsFromPlaTemplate(rawHtml: string): { headline?: string; imageUrl?: string } {
+  const d = unescapeHex(rawHtml);
+  const m = d.match(
+    /data-p="%\.@\.\[&quot;(https:\/\/encrypted-tbn[^"]*?)&quot;,&quot;((?:(?!&quot;).)*?)&quot;/,
+  );
+  if (!m) return {};
+  const dec = (s: string) =>
+    s
+      .replace(/\\\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+      .replace(/&amp;/g, '&')
+      .trim();
+  const imageUrl = dec(m[1]!);
+  const headline = dec(m[2]!) || undefined;
+  return { headline, imageUrl: /^https:\/\//.test(imageUrl) ? imageUrl : undefined };
 }
 
 /** \xNN 16진 이스케이프 복원 */
@@ -370,17 +400,19 @@ export class TransparencyCrawlAdsSource implements AdsSource {
         const ytId = extractYouTubeId(html);
         if (ytId && !videoUrl) videoUrl = `https://www.youtube.com/embed/${ytId}`;
 
-        // 대안별 구성요소 — adData JSON → HTML 마크업 템플릿 → 검색형(Single Ad) 템플릿 순 폴백
+        // 대안별 구성요소 — adData JSON → HTML 마크업 → 검색형(Single Ad) → 쇼핑(PLA) 순 폴백
         const t = componentsFromHtmlTemplate(html);
         const s = componentsFromSearchAdTemplate(html);
+        const pla = componentsFromPlaTemplate(html);
         const v: AdVariationDetail = {
           idx,
-          headline: fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline') ?? t.headline ?? s.headline,
+          headline:
+            fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline') ?? t.headline ?? s.headline ?? pla.headline,
           description:
             fieldValue(html, 'description') ?? fieldValue(html, 'body_text') ?? t.description ?? s.description,
           ctaText: fieldValue(html, 'callToActionText') ?? t.ctaText,
           logoUrl: extractLogo(html) ?? t.logoUrl,
-          imageUrl: t.imageUrl,
+          imageUrl: t.imageUrl ?? pla.imageUrl,
           landingUrl: extractLandingUrl(html) ?? t.landingUrl ?? s.landingUrl,
         };
         // 광고 단위 크기 — previewMetadata 실측값

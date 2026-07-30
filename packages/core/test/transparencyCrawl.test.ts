@@ -348,6 +348,22 @@ describe('TransparencyCrawlAdsSource', () => {
     }
   });
 
+  // 실측 회귀: 쇼핑 광고(PLA) — data-p 속성에 [상품이미지, 상품명, 판매자, 플랫폼] JSON.
+  // 상품 이미지는 encrypted-tbn*.gstatic.com/shopping?q=tbn:… (쿼리가 식별자라 제거 금지).
+  it('getAdDetail: 쇼핑 광고(PLA) — data-p 에서 상품 이미지·상품명 추출', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    const get = vi.fn(
+      async () =>
+        '<c-wiz jsrenderer="dtLcSd" data-p="%.@.[&quot;https://encrypted-tbn1.gstatic.com/shopping?q\\\\u003dtbn:ANd9GcTwmls&quot;,&quot;포디온 코어 Tri-core Balance Dynamics&quot;,&quot;포디온&quot;,&quot;Google&quot;]]" view c-wiz>' +
+        ',"previewMetadata":[{"width":300,"height":250}]',
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_PLA', format: 'image' });
+    expect(detail.imageUrl).toBe('https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcTwmls'); // = 복원
+    expect(detail.headline).toBe('포디온 코어 Tri-core Balance Dynamics');
+    expect(detail.variations![0]).toMatchObject({ width: 300, height: 250 });
+  });
+
   it('도메인 검색은 미지원(예외)', async () => {
     const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(), get: vi.fn() });
     await expect(src.searchAdvertisersByDomain({ domain: 'x.com' })).rejects.toThrow(/회사명 검색/);
