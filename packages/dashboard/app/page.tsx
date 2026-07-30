@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import DeleteAdButton from '@/components/DeleteAdButton';
 import { bestAds, listAds, listCompetitors, type AdCard, type AdSort, type BestAd, type BestPeriod } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic'; // 항상 최신 DB 반영
@@ -51,6 +52,8 @@ function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: 
             #{rank}
           </span>
         )}
+        {/* 잘못 수집된 광고를 목록에서 바로 정리 (카드 클릭 네비게이션은 컴포넌트가 차단) */}
+        <DeleteAdButton adId={ad.id} label="✕" compact />
       </div>
       <div className="body">
         {rank != null && <div className="title">{ad.competitorName}</div>}
@@ -228,7 +231,7 @@ async function GroupedView({
   minViews: number;
   from?: string;
   to?: string;
-  competitors: Array<{ id: string; name: string; adCount: number }>;
+  competitors: Array<{ id: string; name: string; advertiserId: string; adCount: number }>;
   qs: (patch: Record<string, string>) => string;
 }) {
   const ads = await listAds({
@@ -277,13 +280,22 @@ async function GroupedView({
         <Link href={qs({ competitor: '' })}>
           <span className={`badge ${!competitor ? 'ok' : ''}`}>전체</span>
         </Link>
-        {competitors
-          .filter((c) => c.adCount > 0)
-          .map((c) => (
+        {(() => {
+          // DB 의 경쟁사 목록으로 필터 칩 생성. 같은 이름이 여러 광고주 계정으로 등록된 경우
+          // (예: 드래프터 2계정) advertiser_id 뒷자리를 붙여 구분한다.
+          const shown = competitors.filter((c) => c.adCount > 0);
+          const dupNames = new Set(
+            shown.map((c) => c.name).filter((n, i, arr) => arr.indexOf(n) !== i),
+          );
+          return shown.map((c) => (
             <Link key={c.id} href={qs({ competitor: c.id })}>
-              <span className={`badge ${competitor === c.id ? 'ok' : ''}`}>{c.name} ({c.adCount})</span>
+              <span className={`badge ${competitor === c.id ? 'ok' : ''}`}>
+                {c.name}
+                {dupNames.has(c.name) ? ` ·${c.advertiserId.slice(-4)}` : ''} ({c.adCount})
+              </span>
             </Link>
-          ))}
+          ));
+        })()}
       </div>
 
       {groups.length === 0 ? (
