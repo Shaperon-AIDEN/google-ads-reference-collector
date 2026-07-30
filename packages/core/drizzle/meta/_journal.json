@@ -22,6 +22,13 @@
       "when": 1785288442382,
       "tag": "0002_loud_wrecker",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785390681125,
+      "tag": "0003_wonderful_red_wolf",
+      "breakpoints": true
     }
   ]
 }

@@ -44,9 +44,12 @@ export const ads = pgTable('ads', {
   youtubeVideoId: text('youtube_video_id'),
   // 영상 게시일 (YouTube snippet.publishedAt) — 최신순 정렬 기준. 비-YouTube·미조회 시 null.
   publishedAt: timestamp('published_at', { withTimezone: true }),
-  // 이미지 광고의 크리에이티브 이미지 URL, 광고 문구(headline) — 텍스트/이미지 광고 표시용.
+  // 광고 구성요소 — 투명성 센터의 완성 광고를 대시보드에서 재현하기 위해 저장한다.
+  // (배너 이미지 + headline + description + CTA 를 조합하면 원본과 거의 동일하게 보인다)
   imageUrl: text('image_url'),
   headline: text('headline'),
+  description: text('description'),
+  ctaText: text('cta_text'),
   thumbnailPath: text('thumbnail_path'),
   landingUrl: text('landing_url'),
   landingDomain: text('landing_domain'),

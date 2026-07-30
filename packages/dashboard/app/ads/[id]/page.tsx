@@ -99,27 +99,46 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
       </div>
       <h1>{ad.competitorName} <span className={`badge ${ad.format}`}>{ad.format}</span></h1>
 
-      <div className="panel">
-        {ad.headline && ad.format !== 'video' && (
-          <p style={{ fontSize: 16, fontWeight: 600, marginTop: 0 }}>{ad.headline}</p>
-        )}
+      {/* 광고 미리보기 — 투명성 센터의 완성 광고를 구성요소(배너/영상 + headline + description + CTA)로 재현 */}
+      <div className="panel" style={{ maxWidth: 420, padding: 0, overflow: 'hidden' }}>
         {ad.youtubeVideoId ? (
           // 비디오(YouTube): 임베드 재생
           <div style={{ position: 'relative', paddingTop: '56.25%' }}>
             <iframe
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0, borderRadius: 8 }}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
               src={`https://www.youtube.com/embed/${ad.youtubeVideoId}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
           </div>
         ) : ad.imageUrl ? (
-          // 이미지 광고: 크리에이티브 이미지 표시
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={ad.imageUrl} alt={ad.headline ?? ad.creativeId} style={{ maxWidth: '100%', borderRadius: 8 }} />
-        ) : (
-          // 비-YouTube 영상·텍스트·이미지 미확보: 원본 링크로 안내
-          <div>
+          <img src={ad.imageUrl} alt={ad.headline ?? ad.creativeId} style={{ display: 'block', width: '100%' }} />
+        ) : null}
+
+        {/* 배너 아래 텍스트 영역 — 원본 광고와 동일한 구성 */}
+        {(ad.headline || ad.description || ad.ctaText) && (
+          <div style={{ padding: '20px 22px 16px' }}>
+            <div className="muted" style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 14 }}>
+              {ad.landingDomain ?? ad.competitorName}
+            </div>
+            {ad.headline && (
+              <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.25, marginBottom: 12 }}>{ad.headline}</div>
+            )}
+            {ad.description && (
+              <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>{ad.description}</div>
+            )}
+            {ad.ctaText && (
+              <div style={{ borderTop: '1px solid var(--border)', marginTop: 18, paddingTop: 12, textAlign: 'right', fontWeight: 600 }}>
+                {ad.ctaText} <span aria-hidden>›</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 영상·이미지·문구가 모두 없으면 원본 링크로 안내 */}
+        {!ad.youtubeVideoId && !ad.imageUrl && !ad.headline && !ad.description && (
+          <div style={{ padding: 20 }}>
             <p className="muted">
               {ad.format === 'video'
                 ? 'YouTube 외 영상은 원본 링크로 확인합니다 (스트림 URL 은 만료될 수 있음).'
@@ -144,6 +163,9 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
             <tr><th>게재 기간</th><td>{ad.firstShown ?? '—'} ~ {ad.lastShown ?? '—'} ({ad.daysShown ?? '—'}일)</td></tr>
             {ad.format === 'video' && <tr><th>총 조회수</th><td>{fmt(ad.latestViews)}</td></tr>}
             {ad.format === 'video' && <tr><th>총 좋아요</th><td>{fmt(latestLikes)}</td></tr>}
+            {ad.headline && <tr><th>헤드라인</th><td>{ad.headline}</td></tr>}
+            {ad.description && <tr><th>설명</th><td>{ad.description}</td></tr>}
+            {ad.ctaText && <tr><th>CTA</th><td>{ad.ctaText}</td></tr>}
             <tr><th>랜딩 URL</th><td>{ad.landingUrl ? <a href={ad.landingUrl} target="_blank" rel="noreferrer">{ad.landingUrl}</a> : '—'}</td></tr>
             <tr><th>랜딩 도메인</th><td>{ad.landingDomain ?? '—'}</td></tr>
             <tr><th>크리에이티브 ID</th><td style={{ fontFamily: 'monospace', fontSize: 12 }}>{ad.creativeId}</td></tr>

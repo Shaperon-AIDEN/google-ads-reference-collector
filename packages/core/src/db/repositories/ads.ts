@@ -33,6 +33,8 @@ export class AdRepository {
           youtubeVideoId: input.youtubeVideoId,
           imageUrl: input.imageUrl,
           headline: input.headline,
+          description: input.description,
+          ctaText: input.ctaText,
           thumbnailPath: input.thumbnailPath,
           landingUrl: input.landingUrl,
           landingDomain: input.landingDomain,
