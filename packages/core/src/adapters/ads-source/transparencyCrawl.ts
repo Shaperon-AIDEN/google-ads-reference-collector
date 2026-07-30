@@ -106,6 +106,16 @@ function previewUrls(variations: Json[]): string[] {
   return out;
 }
 
+/**
+ * content.js 의 `logo` 필드에서 브랜드 로고 추출. 실측상 base64 데이터 URI(~10KB) 또는
+ * http URL 로 온다. URL 형태가 아닌 값(레이아웃 키워드 등)은 버린다.
+ */
+function extractLogo(html: string): string | undefined {
+  const v = fieldValue(html, 'logo');
+  if (v && (/^data:image\//.test(v) || /^https?:\/\//.test(v))) return v;
+  return undefined;
+}
+
 /** \xNN 16진 이스케이프 복원 */
 function unescapeHex(s: string): string {
   return s.replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
@@ -246,6 +256,7 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     let headline: string | undefined;
     let description: string | undefined;
     let ctaText: string | undefined;
+    let logoUrl: string | undefined;
     // 미리보기 content.js 에서 YouTube ID·랜딩·구성요소 추출.
     // 문구를 확보하면 즉시 중단 → 대부분 1요청(기존과 동일 비용), 문구 없는 광고만 최대 3개 시도.
     for (const previewUrl of previewUrls(variations).slice(0, 3)) {
@@ -260,6 +271,7 @@ export class TransparencyCrawlAdsSource implements AdsSource {
         headline ??= fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline');
         description ??= fieldValue(html, 'description') ?? fieldValue(html, 'body_text');
         ctaText ??= fieldValue(html, 'callToActionText');
+        logoUrl ??= extractLogo(html);
         if (headline || description) break;
       } catch {
         // 개별 미리보기 실패는 상세 저장을 막지 않는다 (다음 variation 시도)
@@ -267,7 +279,17 @@ export class TransparencyCrawlAdsSource implements AdsSource {
     }
 
     return {
-      detail: { creativeId: p.creativeId, videoUrl, imageUrl, landingUrl, headline, description, ctaText, raw: json },
+      detail: {
+        creativeId: p.creativeId,
+        videoUrl,
+        imageUrl,
+        landingUrl,
+        headline,
+        description,
+        ctaText,
+        logoUrl,
+        raw: json,
+      },
       apiCalls: 0,
     };
   }

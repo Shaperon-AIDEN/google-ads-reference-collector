@@ -80,6 +80,7 @@ export async function collectAdDetail(deps: HandlerDeps, msg: NewAdQueueMessage)
     headline: detail.headline,
     description: detail.description,
     ctaText: detail.ctaText,
+    logoUrl: detail.logoUrl,
     thumbnailPath,
     landingUrl: detail.landingUrl,
     landingDomain: landingDomain(detail.landingUrl),

@@ -121,9 +121,15 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
         {/* 배너 아래 텍스트 영역 — 원본 광고와 동일한 구성 */}
         {(ad.headline || ad.description || ad.ctaText) && (
           <div style={{ maxWidth: 720, marginTop: 18 }}>
-            <div className="muted" style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
-              {ad.landingDomain ?? ad.competitorName}
-            </div>
+            {ad.logoUrl ? (
+              // 브랜드 로고 — 원본 광고처럼 헤드라인 위에 표시
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={ad.logoUrl} alt="브랜드 로고" style={{ display: 'block', maxHeight: 36, maxWidth: 200, marginBottom: 12 }} />
+            ) : (
+              <div className="muted" style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
+                {ad.landingDomain ?? ad.competitorName}
+              </div>
+            )}
             {ad.headline && (
               <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.25, marginBottom: 10 }}>{ad.headline}</div>
             )}

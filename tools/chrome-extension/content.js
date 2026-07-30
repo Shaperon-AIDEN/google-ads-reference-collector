@@ -39,6 +39,12 @@ function fieldValue(html, field) {
   if (!m) m = html.match(new RegExp(`["']?${field}["']?\\s*:\\s*["']([^"']+)["']`));
   return m && m[1] ? unescapeHex(m[1]).trim() : undefined;
 }
+// content.js 의 logo 필드 — base64 데이터 URI(~10KB) 또는 http URL. URL 형태 아니면 버림.
+function extractLogo(html) {
+  const v = fieldValue(html, 'logo');
+  if (v && (/^data:image\//.test(v) || /^https?:\/\//.test(v))) return v;
+  return undefined;
+}
 function extractLandingUrl(html) {
   const dest = fieldValue(html, 'destination_url');
   if (dest && /^https?:\/\//i.test(dest)) return dest;
@@ -235,7 +241,7 @@ async function getDetail(advertiserId, creativeId) {
   const variations = (json['1'] && json['1']['5']) || [];
   // 이미지 광고는 응답에서 바로 추출(미리보기 fetch 불필요), 문구·랜딩은 미리보기 content.js 에서
   let imageUrl = imageFromVariations(variations);
-  let videoUrl, landingUrl, headline, description, ctaText, youtubeVideoId;
+  let videoUrl, landingUrl, headline, description, ctaText, logoUrl, youtubeVideoId;
   // 문구를 확보하면 즉시 중단 → 대부분 1요청(기존과 동일), 문구 없는 광고만 최대 3개 variation 시도
   for (const previewUrl of previewUrls(variations).slice(0, 3)) {
     const r = await bg({ type: 'fetchText', url: previewUrl });
@@ -251,11 +257,12 @@ async function getDetail(advertiserId, creativeId) {
     headline = headline || fieldValue(r.text, 'headline') || fieldValue(r.text, 'longHeadline');
     description = description || fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text');
     ctaText = ctaText || fieldValue(r.text, 'callToActionText');
+    logoUrl = logoUrl || extractLogo(r.text);
     if (headline || description) break;
   }
   // raw 는 그대로 보존해 저장한다(프로젝트 규칙) — 형식이 바뀌거나 추출이 실패했을 때
   // 재수집 없이 DB 의 raw 로 원인을 진단할 수 있다.
-  return { youtubeVideoId, videoUrl, imageUrl, landingUrl, headline, description, ctaText, raw: json };
+  return { youtubeVideoId, videoUrl, imageUrl, landingUrl, headline, description, ctaText, logoUrl, raw: json };
 }
 
 async function collectAdvertiser(advertiserId, cfg) {

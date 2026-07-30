@@ -58,7 +58,7 @@
 
 - **수집·표시 스코프는 `COLLECT_FORMATS` env 로 제어한다** — `video`(기본, 비디오만) / `all`(텍스트·이미지 포함). 되돌리려면 이 값만 `video` 로 바꾸면 됨(수집기·대시보드 공통, 코드 변경 없음). `isFormatAllowed(format, scope)` 헬퍼가 목록 수집 단계에서 신규 감지·저장을 필터한다.
 - **조회수·좋아요·클릭수는 텍스트/이미지 광고에 없다.** 투명성 센터(크롤·SerpApi)는 상업 광고의 조회/클릭/노출/비용을 공개하지 않는다(정치·선거 광고만 노출·비용 range 제공). 비디오 조회수·좋아요는 YouTube 영상 ID 로 YouTube API 를 교차조회해 얻는 것이라 텍스트/이미지엔 해당 없음. 텍스트/이미지에서 확보 가능한 추가 메타데이터는 `image_url`(이미지 크리에이티브 URL)·`headline`(문구)·랜딩 URL·게재기간뿐.
-- **광고 구성요소 저장·재현:** 투명성 센터의 완성 광고는 `배너 이미지(또는 영상) + headline + description + CTA` 조합이다. 이 요소를 `ads.image_url·headline·description·cta_text` 에 저장(마이그레이션 0003)하고 **대시보드 상세에서 조합 렌더링**해 원본과 거의 동일하게 보여준다(스크린샷 불필요 — 가볍고 검색·필터 가능). content.js 의 `headline`/`longHeadline`·`description`/`body_text`·`callToActionText` 에서 추출.
+- **광고 구성요소 저장·재현:** 투명성 센터의 완성 광고는 `배너 이미지(또는 영상) + 브랜드 로고 + headline + description + CTA` 조합이다. 이 요소를 `ads.image_url·logo_url·headline·description·cta_text` 에 저장(마이그레이션 0003·0004)하고 **대시보드 상세에서 조합 렌더링**해 원본과 거의 동일하게 보여준다(스크린샷 불필요 — 가볍고 검색·필터 가능). content.js 의 `headline`/`longHeadline`·`description`/`body_text`·`callToActionText`·`logo` 에서 추출. **로고는 base64 데이터 URI(~10KB)일 수 있어** 목록 쿼리(AdCard)에는 싣지 않고 상세에서만 조회한다.
 - 대시보드: 비디오는 **YouTube 임베드**(비-YouTube 영상은 만료되므로 투명성 센터 링크), 이미지는 `image_url` 표시, 텍스트는 `headline` 표시. 목록의 "조회수 없는 항목 숨김"은 스코프 `all`일 때 **비디오에만** 적용(텍스트/이미지는 원래 조회수가 없으므로 항상 표시).
 - 영상 원본 파일은 저장하지 않는다 (URL 만 확보).
 

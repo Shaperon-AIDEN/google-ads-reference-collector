@@ -195,6 +195,8 @@ export async function bestAds(period: BestPeriod, minViews = 0, from?: string, t
 export interface AdDetailView extends AdCard {
   landingDomain: string | null;
   videoUrl: string | null;
+  // 로고는 base64 데이터 URI(~10KB)일 수 있어 목록(AdCard)에는 싣지 않고 상세만 조회한다.
+  logoUrl: string | null;
   advertiserId: string;
   metrics: Array<{ date: string; views: number | null; likes: number | null }>;
 }
@@ -217,6 +219,7 @@ export async function getAd(id: string): Promise<AdDetailView | null> {
       headline: ads.headline,
       description: ads.description,
       ctaText: ads.ctaText,
+      logoUrl: ads.logoUrl,
       landingUrl: ads.landingUrl,
       landingDomain: ads.landingDomain,
       videoUrl: ads.videoUrl,
