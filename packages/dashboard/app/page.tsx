@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import CompetitorSelect from '@/components/CompetitorSelect';
 import DeleteAdButton from '@/components/DeleteAdButton';
+import FavoriteButton from '@/components/FavoriteButton';
+import { getSessionUser } from '@/lib/accounts';
+import { listFavoriteAdIds } from '@/lib/queries';
 import { bestAds, listAds, listCompetitors, type AdCard, type AdSort, type BestAd, type BestPeriod } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic'; // 항상 최신 DB 반영
@@ -26,7 +29,19 @@ const VIEW_PRESETS: Array<{ label: string; v: number }> = [
 
 const BEST_LABEL: Record<BestPeriod, string> = { day: '일간 베스트', week: '주간 베스트', month: '월간 베스트' };
 
-function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: number | null }) {
+function AdCardView({
+  ad,
+  rank,
+  growth,
+  fav = false,
+  loggedIn = false,
+}: {
+  ad: AdCard;
+  rank?: number;
+  growth?: number | null;
+  fav?: boolean;
+  loggedIn?: boolean;
+}) {
   // 썸네일: 비디오=YouTube 썸네일, 이미지=크리에이티브 이미지, 텍스트=문구 미리보기
   const thumb = thumbUrl(ad.youtubeVideoId) ?? ad.imageUrl;
   const isVideo = ad.format === 'video';
@@ -72,6 +87,7 @@ function AdCardView({ ad, rank, growth }: { ad: AdCard; rank?: number; growth?: 
         )}
         {/* 잘못 수집된 광고를 목록에서 바로 정리 (카드 클릭 네비게이션은 컴포넌트가 차단) */}
         <DeleteAdButton adId={ad.id} label="✕" compact />
+        <FavoriteButton adId={ad.id} initialFav={fav} loggedIn={loggedIn} compact />
       </div>
       <div className="body">
         {rank != null && <div className="title">{ad.competitorName}</div>}
@@ -105,6 +121,7 @@ export default async function ReferenceListPage({
     best?: string;
     from?: string;
     to?: string;
+    fav?: string;
   };
 }) {
   const sort = (searchParams.sort as AdSort) ?? 'newest';
@@ -118,6 +135,9 @@ export default async function ReferenceListPage({
   const to = isDate(searchParams.to) ? searchParams.to : undefined;
 
   const competitors = await listCompetitors();
+  const user = await getSessionUser();
+  const favIds = user ? await listFavoriteAdIds(user.id) : [];
+  const favOnly = searchParams.fav === '1' && !!user;
 
   const qs = (patch: Record<string, string>) => {
     const base: Record<string, string> = { sort };
@@ -127,6 +147,7 @@ export default async function ReferenceListPage({
     if (best) base.best = best;
     if (from) base.from = from;
     if (to) base.to = to;
+    if (favOnly) base.fav = '1';
     const p = new URLSearchParams({ ...base, ...patch });
     // 빈 값 제거
     for (const [k, v] of [...p.entries()]) if (!v) p.delete(k);
@@ -148,6 +169,11 @@ export default async function ReferenceListPage({
             <span className={`badge ${best === p ? 'ok' : ''}`}>{BEST_LABEL[p]}</span>
           </Link>
         ))}
+        {user && (
+          <Link href={qs({ fav: favOnly ? '' : '1', best: '' })}>
+            <span className={`badge ${favOnly ? 'ok' : ''}`}>♥ 즐겨찾기만</span>
+          </Link>
+        )}
       </div>
 
       {/* 조회수 범위 */}
@@ -181,7 +207,7 @@ export default async function ReferenceListPage({
       </form>
 
       {best ? (
-        <BestView period={best} minViews={minViews} from={from} to={to} />
+        <BestView period={best} minViews={minViews} from={from} to={to} favIds={favIds} loggedIn={!!user} />
       ) : (
         <GroupedView
           sort={sort}
@@ -192,6 +218,9 @@ export default async function ReferenceListPage({
           to={to}
           competitors={competitors}
           qs={qs}
+          favIds={favIds}
+          favOnly={favOnly}
+          loggedIn={!!user}
         />
       )}
     </>
@@ -204,13 +233,18 @@ async function BestView({
   minViews,
   from,
   to,
+  favIds,
+  loggedIn,
 }: {
   period: BestPeriod;
   minViews: number;
   from?: string;
   to?: string;
+  favIds: string[];
+  loggedIn: boolean;
 }) {
   const ads = await bestAds(period, minViews, from, to);
+  const favSet = new Set(favIds);
   return (
     <>
       <h2>
@@ -221,7 +255,7 @@ async function BestView({
       ) : (
         <div className="grid">
           {ads.map((ad: BestAd, i) => (
-            <AdCardView key={ad.id} ad={ad} rank={i + 1} growth={ad.growth} />
+            <AdCardView key={ad.id} ad={ad} rank={i + 1} growth={ad.growth} fav={favSet.has(ad.id)} loggedIn={loggedIn} />
           ))}
         </div>
       )}
@@ -242,6 +276,9 @@ async function GroupedView({
   to,
   competitors,
   qs,
+  favIds,
+  favOnly,
+  loggedIn,
 }: {
   sort: AdSort;
   competitor?: string;
@@ -251,8 +288,11 @@ async function GroupedView({
   to?: string;
   competitors: Array<{ id: string; name: string; advertiserId: string; adCount: number }>;
   qs: (patch: Record<string, string>) => string;
+  favIds: string[];
+  favOnly: boolean;
+  loggedIn: boolean;
 }) {
-  const ads = await listAds({
+  const allAds = await listAds({
     sort,
     competitorId: competitor || undefined,
     format: (format as 'video' | 'image' | 'text') || undefined,
@@ -260,6 +300,8 @@ async function GroupedView({
     from,
     to,
   });
+  const favSet = new Set(favIds);
+  const ads = favOnly ? allAds.filter((a) => favSet.has(a.id)) : allAds;
 
   const byCompetitor = new Map<string, { name: string; ads: AdCard[] }>();
   for (const ad of ads) {
@@ -332,7 +374,7 @@ async function GroupedView({
             </h2>
             <div className="grid">
               {g.ads.map((ad) => (
-                <AdCardView key={ad.id} ad={ad} />
+                <AdCardView key={ad.id} ad={ad} fav={favSet.has(ad.id)} loggedIn={loggedIn} />
               ))}
             </div>
           </section>
