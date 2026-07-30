@@ -431,6 +431,8 @@ export class TransparencyCrawlAdsSource implements AdsSource {
         landingUrl ??= v.landingUrl;
         imageUrl ??= v.imageUrl;
         if (!imageUrl) imageUrl = extractImageUrl(html); // 비디오 discover 배너 폴백
+        // ⚠️ 로고로 판정된 URL 은 광고 이미지로 쓰지 않는다 (로고 오선택 방지)
+        if (imageUrl && logoUrl && imageUrl.split('?')[0] === logoUrl.split('?')[0]) imageUrl = undefined;
 
         if (isVideo && (headline || description)) break;
       } catch {

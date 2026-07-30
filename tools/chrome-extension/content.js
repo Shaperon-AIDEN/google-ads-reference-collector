@@ -374,7 +374,14 @@ async function getDetail(advertiserId, creativeId, format, detailWaitMs) {
     logoUrl = logoUrl || v.logoUrl;
     landingUrl = landingUrl || v.landingUrl;
     // 비디오라도 배너 이미지가 따로 있으면 확보(discover 레이아웃 = 배너+텍스트 조합)
-    if (!imageUrl) imageUrl = v.imageUrl || (await pickBestImage(imageCandidatesFromPreview(r.text)));
+    // ⚠️ 로고로 판정된 URL 은 이미지 후보에서 제외한다 — 정사각 폴백이 로고를 광고 이미지로
+    // 오선택하던 버그(실측: Hättke 1000² 로고가 4개 광고의 image_url 로 저장됨).
+    const logoBase = (v.logoUrl || logoUrl || '').split('?')[0];
+    if (!imageUrl) {
+      const cands = imageCandidatesFromPreview(r.text).filter((u) => !logoBase || u.split('?')[0] !== logoBase);
+      imageUrl = v.imageUrl || (await pickBestImage(cands));
+    }
+    if (imageUrl && logoBase && imageUrl.split('?')[0] === logoBase) imageUrl = undefined;
 
     if (isVideo && (headline || description)) break;
     await sleep(200); // 대안 간 소간격 (본 딜레이는 광고 간에 적용)
