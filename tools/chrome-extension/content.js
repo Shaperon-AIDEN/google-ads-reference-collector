@@ -99,37 +99,70 @@ async function pickBestImage(urls) {
   return pool[0].url;
 }
 
-// --- same-origin RPC (실제 세션) ---
-// credentials:'include' — CAPTCHA 를 풀면 받는 면제 쿠키(GOOGLE_ABUSE_EXEMPTION)를 함께 보내
-// /sorry 차단을 우회하기 위함. ⚠️ 단 로그인 상태면 SAPISID 쿠키가 실려 anji 엔드포인트가
-// SAPISIDHASH 헤더를 요구하며 400 을 반환한다(content script 는 httpOnly SAPISID 를 못 읽어
-// 해시 생성 불가). → **Google 에서 로그아웃한 브라우저/프로필**에서 사용해야 한다.
-async function rpc(path, reqObj) {
-  let res;
+// 페이지 HTML 에서 XSRF 토큰 탐색 (Google Apps Framework). 쿠키를 보낼 때 CSRF 방어가
+// 발동해 토큰을 요구하므로(없으면 400 XsrfException) 함께 실어야 한다.
+function findXsrfToken() {
   try {
-    res = await fetch(`${RPC_BASE}/${path}?authuser=0`, {
+    const html = document.documentElement.outerHTML;
+    const m =
+      html.match(/"xsrf[_-]?token"\s*:\s*"([^"]{10,})"/i) ||
+      html.match(/xsrfToken['"]?\s*[:=]\s*['"]([^'"]{10,})['"]/i) ||
+      html.match(/"SNlM0e"\s*:\s*"([^"]{10,})"/);
+    return m ? m[1] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// --- same-origin RPC (실제 세션) ---
+// 쿠키 전송(credentials:'include')은 CAPTCHA 면제 쿠키(GOOGLE_ABUSE_EXEMPTION)를 활용해
+// /sorry 차단을 우회하려는 목적. ⚠️ 단 **쿠키가 실리면 anji 가 XSRF 토큰을 요구**한다
+// (실측: `XsrfException: XSRF token is MISSING`, 400). 로그인 여부와 무관하게 NID 등
+// 쿠키만 있어도 발동하므로, 페이지에서 토큰을 찾아 헤더로 함께 보낸다.
+// 토큰을 못 찾으면 XSRF 검사가 없는 **익명 호출(credentials:'omit')로 폴백**한다.
+async function rpc(path, reqObj) {
+  const token = findXsrfToken();
+  const headers = { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8' };
+  if (token) headers['x-framework-xsrf-token'] = token;
+
+  async function attempt(creds) {
+    return fetch(`${RPC_BASE}/${path}?authuser=0`, {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      headers,
       body: 'f.req=' + encodeURIComponent(JSON.stringify(reqObj)),
-      credentials: 'include',
+      credentials: creds,
       // redirect:'manual' — 차단 시 /sorry(다른 오리진)로 302 되는데, 이를 따라가면 CORS 로
       // "Failed to fetch" 가 난다. manual 이면 opaqueredirect(status 0) 로 받아 차단 감지 가능.
       redirect: 'manual',
     });
-  } catch {
-    // fetch 자체 실패(Failed to fetch) = 네트워크 오류 또는 차단 리다이렉트
-    throw new Error('BLOCKED');
   }
-  // opaqueredirect(status 0/type opaqueredirect) 또는 302 = /sorry 봇 차단
+
+  let res;
+  try {
+    // 토큰이 있으면 쿠키 포함(면제 쿠키 활용), 없으면 처음부터 익명
+    res = await attempt(token ? 'include' : 'omit');
+  } catch {
+    throw new Error('BLOCKED'); // fetch 실패 = 네트워크 오류 또는 차단 리다이렉트
+  }
   if (res.type === 'opaqueredirect' || res.status === 0 || res.status === 302) throw new Error('BLOCKED');
-  const text = await res.text();
+
+  let text = await res.text();
+  // 쿠키를 보냈는데 XSRF 로 거부되면(토큰이 틀렸거나 만료) 익명으로 재시도
+  if (res.status === 400 && /Xsrf/i.test(text)) {
+    try {
+      res = await attempt('omit');
+    } catch {
+      throw new Error('BLOCKED');
+    }
+    if (res.type === 'opaqueredirect' || res.status === 0 || res.status === 302) throw new Error('BLOCKED');
+    text = await res.text();
+  }
+
   const t = text.trimStart();
   if (t.startsWith('<')) throw new Error('BLOCKED'); // HTML = 차단 페이지
   if (!res.ok) {
-    // 응답 본문을 반드시 함께 노출한다 — 400 의 원인은 로그인(SAPISID) 외에도
-    // 잘못된 advertiser_id·요청 형식 등이 있어, 본문 없이는 오진하게 된다.
-    const hint = res.status === 400 ? ' [400 원인 후보: 로그인 쿠키(SAPISID) 충돌 / 잘못된 advertiser_id / 요청 형식]' : '';
-    throw new Error(`RPC ${res.status}: ${t.slice(0, 200) || '(본문 없음)'}${hint}`);
+    // 응답 본문을 반드시 노출한다 — 본문 없이는 원인을 오진하게 된다.
+    throw new Error(`RPC ${res.status}: ${t.slice(0, 200) || '(본문 없음)'}`);
   }
   // Google 은 JSON 하이재킹 방지로 )]}' 접두어를 붙일 수 있음 → 정상 응답
   return JSON.parse(t.replace(/^\)\]\}'\s*/, ''));
