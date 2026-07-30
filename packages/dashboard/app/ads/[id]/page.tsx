@@ -69,10 +69,65 @@ function DailyGrowthChart({
   );
 }
 
+/**
+ * 검색형 텍스트 광고 렌더 — 투명성 센터가 검색 광고를 보여주는 모습 그대로
+ * (도메인 헤더 + 파란 헤드라인 + 회색 설명). 이미지 자산이 없는 텍스트 광고용.
+ */
+function SearchAdCard({
+  url,
+  headline,
+  description,
+  width = 420,
+}: {
+  url: string | null;
+  headline: string | null;
+  description: string | null;
+  width?: number;
+}) {
+  const domain = url ? url.replace(/^https?:\/\//, '').replace(/\/$/, '') + '/' : null;
+  return (
+    <div style={{ width, maxWidth: '100%', background: '#fff', borderRadius: 12, border: '1px solid var(--border)', padding: '18px 20px' }}>
+      {domain && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <span
+            aria-hidden
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background: '#e8f0fe',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 15,
+            }}
+          >
+            🌐
+          </span>
+          <span style={{ color: '#202124', fontSize: 14 }}>{domain}</span>
+        </div>
+      )}
+      {headline && (
+        <div style={{ color: '#1a4fd6', fontSize: 22, fontWeight: 500, lineHeight: 1.35, marginBottom: 10 }}>{headline}</div>
+      )}
+      {description && <div style={{ color: '#4d5156', fontSize: 15, lineHeight: 1.5 }}>{description}</div>}
+    </div>
+  );
+}
+
 /** 대안 1건 렌더 — 실제 광고 단위 크기의 흰 카드로 조합 (대안마다 사이즈·문구가 다르다) */
-function VariationCard({ v }: { v: AdVariationView }) {
+function VariationCard({ v, format }: { v: AdVariationView; format: string }) {
   const w = v.width && v.width > 0 ? Math.min(v.width, 480) : 300;
   const label = `대안 ${v.idx + 1}${v.width && v.height ? ` · ${v.width}×${v.height}` : ''}`;
+  // 검색형 텍스트 대안: 이미지 자산이 없으므로 검색 광고 스타일로 렌더
+  if (format === 'text' && !v.imageUrl && (v.headline || v.description)) {
+    return (
+      <div style={{ flexShrink: 0 }}>
+        <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>{label}</div>
+        <SearchAdCard url={v.landingUrl} headline={v.headline} description={v.description} width={Math.max(w, 380)} />
+      </div>
+    );
+  }
   return (
     <div style={{ flexShrink: 0 }}>
       <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>{label}</div>
@@ -114,6 +169,8 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
   const ad = await getAd(params.id);
   if (!ad) notFound();
   const variations = await getAdVariations(params.id);
+  // 검색형 텍스트 광고(이미지 자산 없음)는 검색 광고 스타일로 렌더
+  const searchStyle = !ad.youtubeVideoId && !ad.imageUrl && ad.format === 'text' && !!(ad.headline || ad.description);
 
   // 일별 증가량 = 해당 스냅샷 조회수 − 직전 스냅샷 조회수 (음수 방지)
   const deltas: Array<{ date: string; delta: number }> = [];
@@ -158,10 +215,13 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
           // 이미지 광고: 크리에이티브 이미지 표시
           // eslint-disable-next-line @next/next/no-img-element
           <img src={ad.imageUrl} alt={ad.headline ?? ad.creativeId} style={{ maxWidth: '100%', borderRadius: 8 }} />
+        ) : searchStyle ? (
+          // 검색형 텍스트 광고 — 투명성 센터의 검색 광고 렌더링 재현 (도메인 + 파란 헤드라인 + 설명)
+          <SearchAdCard url={ad.landingUrl ?? (ad.landingDomain ? `https://${ad.landingDomain}` : null)} headline={ad.headline} description={ad.description} width={480} />
         ) : null}
 
-        {/* 배너 아래 텍스트 영역 — 원본 광고와 동일한 구성 */}
-        {(ad.headline || ad.description || ad.ctaText) && (
+        {/* 배너 아래 텍스트 영역 — 원본 광고와 동일한 구성 (검색형은 위 카드가 전부 표현) */}
+        {!searchStyle && (ad.headline || ad.description || ad.ctaText) && (
           <div style={{ maxWidth: 720, marginTop: 18 }}>
             {ad.logoUrl ? (
               // 브랜드 로고 — 원본 광고처럼 헤드라인 위에 표시
@@ -213,7 +273,7 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
           <h2>대안 ({variations.length})</h2>
           <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8, alignItems: 'flex-start' }}>
             {variations.map((v) => (
-              <VariationCard key={v.id} v={v} />
+              <VariationCard key={v.id} v={v} format={ad.format} />
             ))}
           </div>
         </>
