@@ -84,6 +84,7 @@
 
 - **동기:** 서버(로컬·DGX 등 데이터센터 IP)로 직접 크롤하면 Google `/sorry`(비정상 트래픽 차단)에 막힌다. **실제 사용자 브라우저의 first-party 요청은 차단을 회피**하므로, Chrome 확장이 투명성 센터에서 수집해 백엔드로 전송한다. (Playwright 헤드리스는 탐지되므로 사용 안 함)
 - 확장(`tools/chrome-extension/`): content script 가 adstransparency.google.com 페이지 컨텍스트에서 `SearchCreatives`·`GetCreativeById` 를 **same-origin** 호출(파싱은 `transparencyCrawl.ts` 와 동일), 미리보기 content.js·백엔드 POST 는 background 서비스워커가 대행(CORS 회피). 이미 저장된 것은 `/api/known` 으로 걸러 **신규만 상세 요청**.
+- **⚠️ 쿠키를 보내면 XSRF 토큰이 필요하다(실측):** `credentials:'include'` 로 쿠키를 실으면 anji 가 CSRF 방어를 발동해 `400 XsrfException: XSRF token is MISSING` 을 반환한다(로그인 여부 무관 — NID 같은 쿠키만 있어도 발동). 확장은 페이지 HTML 에서 XSRF 토큰을 찾아 `x-framework-xsrf-token` 헤더로 보내고, 없거나 거부되면 **XSRF 검사가 없는 익명 호출(`credentials:'omit'`)로 자동 폴백**한다. 쿠키를 보내는 목적은 CAPTCHA 면제 쿠키로 `/sorry` 를 우회하는 것.
 - 백엔드 엔드포인트(`packages/functions/src/functions/ingestHttp.ts`, CORS 허용): `POST /api/ingest`(저장), `POST /api/known`(기존 creative_id), `GET /api/advertisers`(경쟁사 목록). 저장 핸들러 `ingestCreatives` 는 collectAdDetail 의 저장 계층 재사용 — creative_id 멱등 upsert + (비디오면)YouTube 조회수/좋아요/게시일 스냅샷(서버 측, 무료). 저장 스코프는 `COLLECT_FORMATS` 따름(확장은 전체 전송, 백엔드가 필터).
 - 사용법·설치는 `tools/chrome-extension/README.md`. 요청 간격(delay)·차단 감지 자동 중단 내장.
 
