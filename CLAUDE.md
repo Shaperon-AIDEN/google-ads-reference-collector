@@ -65,6 +65,12 @@
 - 대시보드: 비디오는 **YouTube 임베드**(비-YouTube 영상은 만료되므로 투명성 센터 링크), 이미지는 `image_url` 표시, 텍스트는 `headline` 표시. 목록의 "조회수 없는 항목 숨김"은 스코프 `all`일 때 **비디오에만** 적용(텍스트/이미지는 원래 조회수가 없으므로 항상 표시).
 - 영상 원본 파일은 저장하지 않는다 (URL 만 확보).
 
+## 회원/즐겨찾기 (대시보드)
+
+- 회원가입은 **`nizcorp.com`·`shaperon.com` 도메인 이메일만** 허용 — 화이트리스트는 `packages/dashboard/lib/accounts.ts` 의 `ALLOWED_SIGNUP_DOMAINS`(서버 측 검증).
+- 인증은 외부 의존성 없이 구현: 비밀번호 scrypt(`salt:hash`, Node 내장 crypto) + DB 세션(`user_sessions`) + httpOnly 쿠키(`adref_session`, 30일). Azure 배포 시 Easy Auth(Entra)로 대체 가능하나 현재는 자체 세션이 기준.
+- 즐겨찾기는 `ad_favorites (user_id, ad_id)` — 광고/사용자 삭제 시 cascade. UI: 카드·상세 ♥ 토글(비로그인 클릭 → /login), 목록 "♥ 즐겨찾기만" 필터(`?fav=1`).
+
 ## 규칙
 
 - 시크릿(SerpApi·YouTube 키)은 코드/문서에 하드코딩 금지. 로컬은 `.env`/`local.settings.json`, Azure는 Key Vault.

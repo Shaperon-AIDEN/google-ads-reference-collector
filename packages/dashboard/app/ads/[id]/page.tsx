@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import DeleteAdButton from '@/components/DeleteAdButton';
+import FavoriteButton from '@/components/FavoriteButton';
+import { getSessionUser } from '@/lib/accounts';
+import { listFavoriteAdIds } from '@/lib/queries';
 import { getAd, getAdVariations, type AdVariationView } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
@@ -169,6 +172,8 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
   const ad = await getAd(params.id);
   if (!ad) notFound();
   const variations = await getAdVariations(params.id);
+  const user = await getSessionUser();
+  const isFav = user ? (await listFavoriteAdIds(user.id)).includes(ad.id) : false;
   // 검색형 텍스트 광고(이미지 자산 없음)는 검색 광고 스타일로 렌더
   const searchStyle = !ad.youtubeVideoId && !ad.imageUrl && ad.format === 'text' && !!(ad.headline || ad.description);
 
@@ -193,8 +198,11 @@ export default async function AdDetailPage({ params }: { params: { id: string } 
     <>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <p style={{ margin: 0 }}><Link href="/">← 레퍼런스 목록</Link></p>
-        {/* 잘못 수집된 광고 정리 — 삭제 후 목록으로 이동 */}
-        <DeleteAdButton adId={ad.id} label="이 광고 삭제" redirectTo="/" />
+        <span style={{ display: 'inline-flex', gap: 8 }}>
+          <FavoriteButton adId={ad.id} initialFav={isFav} loggedIn={!!user} />
+          {/* 잘못 수집된 광고 정리 — 삭제 후 목록으로 이동 */}
+          <DeleteAdButton adId={ad.id} label="이 광고 삭제" redirectTo="/" />
+        </span>
       </div>
       <h1>{ad.competitorName} <span className={`badge ${ad.format}`}>{ad.format}</span></h1>
 

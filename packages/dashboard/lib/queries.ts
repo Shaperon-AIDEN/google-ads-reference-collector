@@ -195,6 +195,15 @@ export async function bestAds(period: BestPeriod, minViews = 0, from?: string, t
   }));
 }
 
+/** 사용자의 즐겨찾기 광고 id 목록 */
+export async function listFavoriteAdIds(userId: string): Promise<string[]> {
+  const rows = await db()
+    .select({ adId: schema.adFavorites.adId })
+    .from(schema.adFavorites)
+    .where(eq(schema.adFavorites.userId, userId));
+  return rows.map((r) => r.adId);
+}
+
 /** 광고 "대안"(variation) — 대안별 사이즈·문구 */
 export interface AdVariationView {
   id: string;

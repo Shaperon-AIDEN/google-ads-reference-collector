@@ -5,6 +5,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -104,6 +105,41 @@ export const adMetrics = pgTable(
   }),
 );
 
+// 6.1 users — 대시보드 회원 (이메일 도메인 화이트리스트 가입: nizcorp.com·shaperon.com)
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom().notNull(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(), // scrypt `salt:hash` (Node 내장 crypto)
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 6.2 user_sessions — httpOnly 쿠키 세션 (토큰 = 랜덤 64hex)
+export const userSessions = pgTable('user_sessions', {
+  token: text('token').primaryKey().notNull(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 6.3 ad_favorites — 사용자별 광고 즐겨찾기
+export const adFavorites = pgTable(
+  'ad_favorites',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    adId: uuid('ad_id')
+      .notNull()
+      .references(() => ads.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.adId] }),
+  }),
+);
+
 // 5.4 collection_runs — 수집 실행 이력
 export const collectionRuns = pgTable('collection_runs', {
   id: uuid('id').primaryKey().defaultRandom().notNull(),
@@ -126,3 +162,7 @@ export type AdMetric = typeof adMetrics.$inferSelect;
 export type NewAdMetric = typeof adMetrics.$inferInsert;
 export type CollectionRun = typeof collectionRuns.$inferSelect;
 export type NewCollectionRun = typeof collectionRuns.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type UserSession = typeof userSessions.$inferSelect;
+export type AdFavorite = typeof adFavorites.$inferSelect;
