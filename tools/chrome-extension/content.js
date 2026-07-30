@@ -59,7 +59,12 @@ function componentsFromHtmlTemplate(rawHtml) {
     const m = d.match(new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"[^>]*>\\s*<a[^>]*>([\\s\\S]*?)</a>`));
     return clean(m && m[1]);
   };
-  const out = { headline: pick('title'), description: pick('body') };
+  // 쇼핑(PLA) 마크업 변형: 상품명이 <a> 가 아니라 product-name div 안 <span> 에 있다
+  const pickBlock = (cls) => {
+    const m = d.match(new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"[^>]*>([\\s\\S]{0,400}?)</div>`));
+    return clean(m && m[1]);
+  };
+  const out = { headline: pick('title') || pickBlock('product-name'), description: pick('body') };
   for (const m of d.matchAll(/<a[^>]*data-asoch-targets="[^"]*btnClk[^"]*"[^>]*>([\s\S]*?)<\/a>/g)) {
     out.ctaText = clean(m[1]);
     if (out.ctaText) break;
@@ -76,6 +81,11 @@ function componentsFromHtmlTemplate(rawHtml) {
       out.logoUrl = m[1]; // 쿼리 제거 → 원본 해상도
       break;
     }
+  }
+  // 쇼핑(PLA) 마크업 변형: 상품 이미지가 encrypted-tbn 배경이미지로 온다 (쿼리 q=tbn:… 유지)
+  if (!out.imageUrl) {
+    const tbn = d.match(/background-image:url\((https:\/\/encrypted-tbn[^)\s"']+)\)/);
+    if (tbn) out.imageUrl = tbn[1];
   }
   return out;
 }
@@ -101,6 +111,26 @@ function componentsFromSearchAdTemplate(rawHtml) {
   if (description) out.description = description;
   if (/^https?:\/\//i.test(visible)) out.landingUrl = visible;
   else if (/^[a-z0-9.-]+\.[a-z]{2,}/i.test(visible)) out.landingUrl = 'https://' + visible;
+  return out;
+}
+// content.js 네 번째 템플릿(실측): 쇼핑 광고(PLA). <c-wiz data-p="%.@.[&quot;<상품이미지>&quot;,
+// &quot;<상품명>&quot;,…]"> 에 들어있다. 상품 이미지는 encrypted-tbn*.gstatic.com/shopping?q=tbn:…
+// (쿼리가 식별자 — 제거 금지).
+function componentsFromPlaTemplate(rawHtml) {
+  const d = unescapeHex(rawHtml);
+  const m = d.match(/data-p="%\.@\.\[&quot;(https:\/\/encrypted-tbn[^"]*?)&quot;,&quot;((?:(?!&quot;).)*?)&quot;/);
+  if (!m) return {};
+  const dec = (s) =>
+    s
+      .replace(/\\\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+      .replace(/&amp;/g, '&')
+      .trim();
+  const out = {};
+  const img = dec(m[1]);
+  const title = dec(m[2]);
+  if (/^https:\/\//.test(img)) out.imageUrl = img;
+  if (title) out.headline = title;
   return out;
 }
 function extractLandingUrl(html) {
@@ -316,16 +346,18 @@ async function getDetail(advertiserId, creativeId, format, detailWaitMs) {
       youtubeVideoId = extractYouTubeId(r.text);
       if (youtubeVideoId) videoUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
     }
-    // 대안별 구성요소 — adData JSON → HTML 마크업 템플릿 → 검색형(Single Ad) 템플릿 순 폴백
+    // 대안별 구성요소 — adData JSON → HTML 마크업 → 검색형(Single Ad) → 쇼핑(PLA) 순 폴백
     const t = componentsFromHtmlTemplate(r.text);
     const s = componentsFromSearchAdTemplate(r.text);
+    const pla = componentsFromPlaTemplate(r.text);
     const v = {
       idx,
-      headline: fieldValue(r.text, 'headline') || fieldValue(r.text, 'longHeadline') || t.headline || s.headline,
+      headline:
+        fieldValue(r.text, 'headline') || fieldValue(r.text, 'longHeadline') || t.headline || s.headline || pla.headline,
       description: fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text') || t.description || s.description,
       ctaText: fieldValue(r.text, 'callToActionText') || t.ctaText,
       logoUrl: extractLogo(r.text) || t.logoUrl,
-      imageUrl: t.imageUrl,
+      imageUrl: t.imageUrl || pla.imageUrl,
       landingUrl: extractLandingUrl(r.text) || t.landingUrl || s.landingUrl,
     };
     const size = r.text.match(/"width"\s*:\s*(\d+)\s*,\s*"height"\s*:\s*(\d+)/);
