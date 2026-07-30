@@ -14,6 +14,7 @@ export interface IngestAd {
   headline?: string; // 광고 문구
   description?: string; // 부제/설명
   ctaText?: string; // CTA 버튼 문구
+  logoUrl?: string; // 브랜드 로고 (http URL 또는 base64 데이터 URI)
   landingUrl?: string;
   raw?: unknown;
 }
@@ -107,6 +108,7 @@ export async function ingestCreatives(deps: HandlerDeps, payload: IngestPayload)
         headline: ad.headline ?? null,
         description: ad.description ?? null,
         ctaText: ad.ctaText ?? null,
+        logoUrl: ad.logoUrl ?? null,
         thumbnailPath: null, // 대시보드는 youtube_video_id 로 썸네일 URL 유도 (Blob 불필요)
         landingUrl: ad.landingUrl ?? null,
         landingDomain: landingDomain(ad.landingUrl),

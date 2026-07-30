@@ -28,6 +28,7 @@ export interface AdDetail {
   headline?: string;
   description?: string;
   ctaText?: string; // callToActionText (예: "자세히 알아보기", "열기")
+  logoUrl?: string; // 브랜드 로고 (http URL 또는 base64 데이터 URI)
   channelName?: string;
   raw: unknown; // 원본 응답 verbatim → ads.raw (jsonb)
 }

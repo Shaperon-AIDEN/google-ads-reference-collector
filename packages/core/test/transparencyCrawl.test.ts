@@ -223,6 +223,7 @@ describe('TransparencyCrawlAdsSource', () => {
         '\\x27headline\\x27: \\x27동양인 잇몸이 유독 약한 이유\\x27',
         '\\x27description\\x27: \\x27한 방울이면 차오릅니다\\x27',
         '\\x27callToActionText\\x27: \\x27열기\\x27',
+        '\\x27logo\\x27: \\x27data:image/png;base64,iVBORw0KGgo=\\x27',
       ].join(','),
     );
     const src = new TransparencyCrawlAdsSource({ rpc, get });
@@ -231,6 +232,7 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.headline).toBe('동양인 잇몸이 유독 약한 이유');
     expect(detail.description).toBe('한 방울이면 차오릅니다');
     expect(detail.ctaText).toBe('열기');
+    expect(detail.logoUrl).toBe('data:image/png;base64,iVBORw0KGgo='); // 브랜드 로고(데이터 URI)
     expect(detail.landingUrl).toBe('https://dusk.example/lp');
     expect(get).toHaveBeenCalledTimes(1); // 문구 확보 즉시 중단 → 추가 요청 없음
   });

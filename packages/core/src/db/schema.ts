@@ -50,6 +50,8 @@ export const ads = pgTable('ads', {
   headline: text('headline'),
   description: text('description'),
   ctaText: text('cta_text'),
+  // 브랜드 로고 — content.js 의 `logo` 필드. http URL 또는 base64 데이터 URI(~10KB)로 온다.
+  logoUrl: text('logo_url'),
   thumbnailPath: text('thumbnail_path'),
   landingUrl: text('landing_url'),
   landingDomain: text('landing_domain'),

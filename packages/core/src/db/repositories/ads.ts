@@ -47,6 +47,7 @@ export class AdRepository {
           headline: input.headline,
           description: input.description,
           ctaText: input.ctaText,
+          logoUrl: input.logoUrl,
           thumbnailPath: input.thumbnailPath,
           landingUrl: input.landingUrl,
           landingDomain: input.landingDomain,
