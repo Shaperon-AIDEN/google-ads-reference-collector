@@ -20,6 +20,9 @@ export class FakeQueue implements QueueClient {
   async receive(): Promise<never[]> {
     return [];
   }
+  async approximateCount(): Promise<number> {
+    return this.messages.length;
+  }
   async delete(): Promise<void> {}
 }
 

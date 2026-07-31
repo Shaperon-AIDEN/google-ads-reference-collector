@@ -44,6 +44,12 @@ export class AzureStorageQueueClient implements QueueClient {
     });
   }
 
+  async approximateCount(queue: string): Promise<number> {
+    const c = await this.client(queue);
+    const props = await c.getProperties();
+    return props.approximateMessagesCount ?? 0;
+  }
+
   async receive<T>(queue: string, max = 1): Promise<QueueMessage<T>[]> {
     const c = await this.client(queue);
     const res = await c.receiveMessages({ numberOfMessages: max });

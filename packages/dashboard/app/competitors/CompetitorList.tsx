@@ -16,6 +16,13 @@ export default function CompetitorList({ competitors }: { competitors: Row[] }) 
   const [rows, setRows] = useState<Row[]>(competitors);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{
+    listQueue: number;
+    detailQueue: number;
+    windowCount: number;
+    pauseUntil: string | null;
+  } | null>(null);
+  const idleTicks = useRef(0);
   // 수집을 트리거한 시각 — 이후 일정 시간 동안 표를 폴링해 광고 수를 라이브 갱신
   const collectingUntil = useRef<number>(0);
 
@@ -34,10 +41,28 @@ export default function CompetitorList({ competitors }: { competitors: Row[] }) 
     }
   }, []);
 
-  // 수집 트리거 후 ~2분간 5초 주기로 표를 갱신 (백그라운드 수집이 진행되며 광고 수가 늘어남)
+  // 수집 트리거 후 5초 주기로 진행상황·광고 수를 갱신. 큐가 빌 때까지 자동 연장.
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (Date.now() < collectingUntil.current) refresh();
+    const timer = setInterval(async () => {
+      if (Date.now() >= collectingUntil.current) return;
+      refresh();
+      try {
+        const res = await fetch('/api/collect-progress', { cache: 'no-store' });
+        if (!res.ok) return;
+        const p = await res.json();
+        setProgress(p);
+        const active = p.listQueue > 0 || p.detailQueue > 0 || p.pauseUntil;
+        if (active) {
+          idleTicks.current = 0;
+          collectingUntil.current = Date.now() + 120_000; // 활동 중이면 폴링 연장
+        } else if (++idleTicks.current >= 3) {
+          collectingUntil.current = 0; // 15초간 조용하면 종료
+          setProgress(null);
+          setNotice('수집 완료 — 광고 수가 갱신되었습니다.');
+        }
+      } catch {
+        /* 폴링 실패 무시 */
+      }
     }, 5000);
     return () => clearInterval(timer);
   }, [refresh]);
@@ -50,8 +75,9 @@ export default function CompetitorList({ competitors }: { competitors: Row[] }) 
       const data = await res.json().catch(() => ({}));
       if (!res.ok && res.status !== 202) throw new Error(data.error ?? '수집 시작 실패');
       // 백그라운드 큐에 적재됨 — 페이지를 벗어나도 수집은 완료된다
-      setNotice(`'${row.name}' 수집을 시작했습니다. 진행되며 광고 수가 자동 갱신됩니다.`);
-      collectingUntil.current = Date.now() + 120_000; // 2분간 폴링
+      setNotice(`'${row.name}' 수집을 시작했습니다. (페이지를 닫아도 수집은 계속됩니다)`);
+      idleTicks.current = 0;
+      collectingUntil.current = Date.now() + 120_000; // 활동이 있는 동안 자동 연장
       setTimeout(refresh, 2000);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : String(e));
@@ -85,8 +111,17 @@ export default function CompetitorList({ competitors }: { competitors: Row[] }) 
 
   return (
     <>
-      <div className="row" style={{ marginBottom: 8 }}>
+      <div className="row" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
         {notice && <span className="muted">{notice}</span>}
+        {progress && (
+          <span className="badge ok" style={{ fontWeight: 400 }}>
+            {progress.pauseUntil
+              ? `☕ 휴식 중 — ${new Date(progress.pauseUntil).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 자동 재개 (남은 상세 ${progress.detailQueue}건)`
+              : progress.detailQueue > 0 || progress.listQueue > 0
+                ? `수집 중 — 남은 상세 ${progress.detailQueue}건${progress.listQueue > 0 ? ` · 목록 진행 중(${progress.listQueue})` : ''} · 이번 구간 ${progress.windowCount}/500`
+                : '마무리 확인 중…'}
+          </span>
+        )}
         <button className="secondary" style={{ marginLeft: 'auto' }} onClick={refresh}>
           새로고침
         </button>

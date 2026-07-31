@@ -187,6 +187,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'COLLECT_FORMATS', value: 'all' }
         { name: 'AUTH_MODE', value: 'mock' } // 자체 회원가입/세션 사용 — Easy Auth 도입 시 entra
         { name: 'HOSTNAME', value: '0.0.0.0' }
+        { name: 'AzureWebJobsStorage', value: storageConn } // 수집 진행상황(큐 잔량) 조회용
         { name: 'FUNCTIONS_BASE_URL', value: 'https://${funcApp.properties.defaultHostName}/api' }
         { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
       ]
