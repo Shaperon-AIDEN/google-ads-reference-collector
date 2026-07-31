@@ -13,6 +13,9 @@ export interface AdListFilter {
   minViews?: number; // 최신 조회수 하한
   from?: string; // 게재 기간 시작(YYYY-MM-DD) — 이 날짜에도 게재 중이던 광고까지 포함(겹침)
   to?: string; // 게재 기간 종료(YYYY-MM-DD)
+  // 페이지네이션 — 4,900건+ 전체 렌더가 4MB/4초 병목이라 100건씩 나눠 표시 (실측 2026-07-31)
+  limit?: number;
+  offset?: number;
 }
 
 /** 게재 기간이 [from, to] 와 겹치는 광고 조건. null 게재일은 열린 구간으로 취급(관대). */
@@ -124,7 +127,8 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
     .innerJoin(competitors, eq(competitors.id, ads.competitorId))
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(order)
-    .limit(2000); // 표시 대상 전체 확보 (500 이면 형식·경쟁사에 따라 뒤쪽이 잘림 — 특히 조회수 없는 이미지/텍스트)
+    .limit(filter.limit ?? 101) // 페이지 크기 + 1 (다음 페이지 유무 판별)
+    .offset(filter.offset ?? 0);
 
   return rows.map((r) => ({
     ...r,
