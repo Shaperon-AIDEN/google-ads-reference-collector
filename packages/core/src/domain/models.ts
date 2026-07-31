@@ -20,10 +20,12 @@ export function isFormatAllowed(format: AdFormat, scope: 'video' | 'all'): boole
  * URL 로는 구분 불가하고 **크기로만** 판별된다(확장이 픽셀 측정으로 처리). 여기선 명백한 비이미지만 거른다.
  */
 export function isRealCreativeUrl(u: string): boolean {
-  // encrypted-tbn*.gstatic.com/shopping = 쇼핑(PLA) 광고의 상품 이미지 (쿼리 q=tbn:… 이 식별자)
+  // sadbundle(HTML5 번들)은 index.html 등 HTML 자산은 거부하되 **이미지 자산은 허용**
+  // (번들 대표 이미지 추출, 실측). encrypted-tbn/t0~3.gstatic = 쇼핑 상품 이미지(쿼리가 식별자).
+  if (/\/sadbundle\//.test(u)) return /\/archive\/sadbundle\/.*\.(?:jpe?g|png|webp|gif)$/i.test(u.split('?')[0]!);
   return (
-    /\/simgad\/|googleusercontent\.com\/|encrypted-tbn\d*\.gstatic\.com\/(?:shopping|images)/.test(u) &&
-    !/\/pagead\/|\/sadbundle\/|discover_ads/.test(u)
+    /\/simgad\/|googleusercontent\.com\/|(?:encrypted-tbn\d*|t\d)\.gstatic\.com\/(?:shopping|images)/.test(u) &&
+    !/\/pagead\/|discover_ads/.test(u)
   );
 }
 

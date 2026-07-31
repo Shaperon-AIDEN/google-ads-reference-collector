@@ -41,7 +41,11 @@ function fieldValue(html, field) {
 }
 // content.js 의 명시적 이미지 필드(gpa 등: squareImage 에 배너 simgad URL, 실측).
 // 로고와 다른 URL 일 때만 인정.
-const IMAGE_FIELDS = ['squareImage', 'marketingImage', 'landscapeImage', 'square_image', 'landscape_image'];
+// carousel_N_image: 캐러셀(슬라이드) 템플릿 — 첫 슬라이드가 대표 배너 (실측)
+const IMAGE_FIELDS = [
+  'squareImage', 'marketingImage', 'landscapeImage', 'square_image', 'landscape_image',
+  'carousel_0_image', 'carousel_1_image', 'carousel_2_image',
+];
 function extractImageField(html, logoUrl) {
   for (const f of IMAGE_FIELDS) {
     const v = fieldValue(html, f);
@@ -395,6 +399,19 @@ async function getDetail(advertiserId, creativeId, format) {
 
     if (isVideo && (headline || description)) break;
     await sleep(200); // 대안 간 소간격 (본 딜레이는 광고 간에 적용)
+  }
+  // HTML5 번들(sadbundle): index.html 의 이미지 자산을 대표 이미지로 (실측)
+  if (!imageUrl) {
+    for (const v of variations) {
+      const html = v && v['3'] && typeof v['3']['2'] === 'string' ? v['3']['2'] : '';
+      const m = html.match(/src='(https?:\/\/[^']*\/archive\/sadbundle\/[^']*index\.html)'/);
+      if (!m) continue;
+      const r2 = await bg({ type: 'fetchText', url: m[1] });
+      if (r2 && r2.ok && r2.text) {
+        const asset = r2.text.match(/["']([^"'\/\s]+\.(?:jpe?g|png|webp|gif))["']/i);
+        if (asset) { imageUrl = m[1].replace(/index\.html$/, asset[1]); break; }
+      }
+    }
   }
   // raw 는 그대로 보존해 저장한다(프로젝트 규칙) — 형식이 바뀌거나 추출이 실패했을 때
   // 재수집 없이 DB 의 raw 로 원인을 진단할 수 있다.

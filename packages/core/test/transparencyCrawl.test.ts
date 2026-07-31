@@ -361,6 +361,43 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.ctaText).toBe('구매하기');
   });
 
+  // 실측 회귀: /archive/simgad/ 정적 배너는 준정사각(348×366 등)이어도 배너다 — 정사각 제외 미적용
+  it('getAdDetail: 정적 archive/simgad 준정사각 배너는 로고로 오폭하지 않음', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': { '5': [{ '3': { '2': '<img src="https://tpc.googlesyndication.com/archive/simgad/SQ" width="348" height="366">' } }] },
+      }),
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get: vi.fn() });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR', format: 'text' });
+    expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/archive/simgad/SQ');
+  });
+
+  // 실측 회귀: sadbundle(HTML5 번들) — index.html 이 참조하는 이미지 자산을 대표 이미지로
+  it('getAdDetail: sadbundle 번들에서 대표 이미지 추출', async () => {
+    const rpc = vi.fn(async () =>
+      JSON.stringify({
+        '1': { '5': [{ '3': { '2': "<iframe src='https://tpc.googlesyndication.com/archive/sadbundle/$csp%3Darchive$/94493/index.html'></iframe>" } }] },
+      }),
+    );
+    const get = vi.fn(async () => '<img id="x" src="36ycfpposf6hr.jpeg">');
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR', format: 'image' });
+    expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/archive/sadbundle/$csp%3Darchive$/94493/36ycfpposf6hr.jpeg');
+  });
+
+  it('getAdDetail: 캐러셀 템플릿 — carousel_0_image 를 대표 배너로', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    const get = vi.fn(
+      async () =>
+        "\\x27logo\\x27: \\x27https://tpc.googlesyndication.com/simgad/LOGO9\\x27,\\x27carousel_0_image\\x27: \\x27https://tpc.googlesyndication.com/simgad/SLIDE0\\x27",
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR', format: 'image' });
+    expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/simgad/SLIDE0');
+    expect(detail.logoUrl).toBe('https://tpc.googlesyndication.com/simgad/LOGO9');
+  });
+
   it('도메인 검색은 미지원(예외)', async () => {
     const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(), get: vi.fn() });
     await expect(src.searchAdvertisersByDomain({ domain: 'x.com' })).rejects.toThrow(/회사명 검색/);
