@@ -82,11 +82,14 @@ function imageFromVariations(variations: Json[]): string | undefined {
       const h = Number((tag[0].match(/height=["']?(\d+)/i) ?? [])[1]) || 0;
       if (w > 0 && h > 0 && (w <= 64 || h <= 64)) continue; // ⓘ 아이콘·작은 로고 제외
       const r = w > 0 && h > 0 ? w / h : 0;
-      cands.push({ url: src, area: w * h || 1, square: r >= 0.9 && r <= 1.15 }); // ~정사각만 로고로 간주
+      // ⚠️ /archive/simgad/ 는 경로 자체가 실제 크리에이티브 보증 — 정사각이어도 배너다
+      //    (실측: 348×366 등 준정사각 렌더 배너를 로고로 오폭해 5건 누락). 정사각=로고
+      //    추정은 archive 없는 /simgad/ 에만 적용한다.
+      const archive = /\/archive\/simgad\//.test(src);
+      cands.push({ url: src, area: w * h || 1, square: !archive && r >= 0.9 && r <= 1.15 });
     }
   }
-  // 정사각(로고)은 제외한다. 배너 비율만 남기고 가장 큰 것을 고른다.
-  // (정사각뿐이면 로고만 있는 광고 → imageUrl 없음)
+  // 정사각(로고 추정)은 제외하고 가장 큰 것을 고른다.
   const nonSquare = cands.filter((c) => !c.square);
   nonSquare.sort((a, b) => b.area - a.area);
   return nonSquare[0]?.url;
@@ -111,7 +114,11 @@ function previewUrls(variations: Json[]): string[] {
  * content.js 의 명시적 이미지 필드에서 배너/상품 이미지 추출 (gpa 등 템플릿, 실측:
  * `squareImage` 필드에 배너 simgad URL). 로고와 다른 URL 일 때만 인정한다.
  */
-const IMAGE_FIELDS = ['squareImage', 'marketingImage', 'landscapeImage', 'square_image', 'landscape_image'];
+// carousel_N_image: 캐러셀(슬라이드) 템플릿 — 첫 슬라이드가 대표 배너 (실측)
+const IMAGE_FIELDS = [
+  'squareImage', 'marketingImage', 'landscapeImage', 'square_image', 'landscape_image',
+  'carousel_0_image', 'carousel_1_image', 'carousel_2_image',
+];
 function extractImageField(html: string, logoUrl?: string): string | undefined {
   for (const f of IMAGE_FIELDS) {
     const v = fieldValue(html, f);
@@ -254,6 +261,27 @@ function componentsFromPlaTemplate(rawHtml: string): { headline?: string; imageU
   const imageUrl = dec(m[1]!);
   const headline = dec(m[2]!) || undefined;
   return { headline, imageUrl: /^https:\/\//.test(imageUrl) ? imageUrl : undefined };
+}
+
+/**
+ * sadbundle(HTML5 번들) 광고의 대표 이미지 추출 — 정적 variation 의
+ * `<iframe src='…/archive/sadbundle/…/index.html'>` 에서 index.html 을 받아
+ * 참조된 이미지 자산(상대경로)을 번들 URL 로 해석한다 (실측: 자산 1개 = 광고 크리에이티브).
+ */
+async function sadbundleImage(variations: Json[], get: (url: string) => Promise<string>): Promise<string | undefined> {
+  for (const v of variations) {
+    const html = typeof (v?.['3'] as Json | undefined)?.['2'] === 'string' ? ((v['3'] as Json)['2'] as string) : '';
+    const m = html.match(/src='(https?:\/\/[^']*\/archive\/sadbundle\/[^']*index\.html)'/);
+    if (!m) continue;
+    try {
+      const index = await get(m[1]!);
+      const asset = index.match(/["']([^"'\/\s]+\.(?:jpe?g|png|webp|gif))["']/i);
+      if (asset) return m[1]!.replace(/index\.html$/, asset[1]!);
+    } catch {
+      // 번들 조회 실패는 무시 (이미지 없이 저장)
+    }
+  }
+  return undefined;
 }
 
 /** \xNN 16진 이스케이프 복원 */
@@ -470,6 +498,9 @@ export class TransparencyCrawlAdsSource implements AdsSource {
         // 개별 미리보기 실패는 상세 저장을 막지 않는다 (다음 variation 시도)
       }
     }
+
+    // HTML5 번들(sadbundle) 광고: index.html 의 이미지 자산을 대표 이미지로
+    if (!imageUrl) imageUrl = await sadbundleImage(variations, (u) => this.t.get(u));
 
     return {
       detail: {
