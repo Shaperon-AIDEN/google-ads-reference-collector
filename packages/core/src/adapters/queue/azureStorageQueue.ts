@@ -36,9 +36,12 @@ export class AzureStorageQueueClient implements QueueClient {
     }
   }
 
-  async enqueue<T>(queue: string, body: T): Promise<void> {
+  async enqueue<T>(queue: string, body: T, opts?: { visibilityTimeoutMs?: number }): Promise<void> {
     const c = await this.client(queue);
-    await c.sendMessage(AzureStorageQueueClient.encode(body));
+    await c.sendMessage(AzureStorageQueueClient.encode(body), {
+      // 지연 재적재 — 이 시간 동안 숨겼다가 소비 가능 (크롤 페이싱의 휴식 구현)
+      visibilityTimeout: opts?.visibilityTimeoutMs ? Math.ceil(opts.visibilityTimeoutMs / 1000) : undefined,
+    });
   }
 
   async receive<T>(queue: string, max = 1): Promise<QueueMessage<T>[]> {

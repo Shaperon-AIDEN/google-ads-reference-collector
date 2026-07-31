@@ -148,6 +148,8 @@ resource funcApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'ADS_SOURCE', value: 'serpapi' } // Azure IP 는 크롤 차단 가능성 높음 → 기본 serpapi
         { name: 'COLLECT_FORMATS', value: 'all' }
         { name: 'CRAWL_THROTTLE_MS', value: '1500' }
+        { name: 'CRAWL_RUN_LIMIT', value: '500' }
+        { name: 'CRAWL_RUN_PAUSE_MS', value: '600000' }
         { name: 'AD_QUEUE_NAME', value: 'new-ads' }
         { name: 'COLLECT_QUEUE_NAME', value: 'collect-requests' }
         { name: 'BLOB_CONTAINER', value: 'thumbnails' }

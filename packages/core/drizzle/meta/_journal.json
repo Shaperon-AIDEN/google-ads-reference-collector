@@ -57,6 +57,13 @@
       "when": 1785423326185,
       "tag": "0007_cheerful_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785470793692,
+      "tag": "0008_glossy_wallow",
+      "breakpoints": true
     }
   ]
 }

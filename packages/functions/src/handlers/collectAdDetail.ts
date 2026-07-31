@@ -16,12 +16,51 @@ function youtubeThumbUrl(videoId: string): string {
 }
 
 /**
+ * 크롤 페이싱 게이트 — 상세 수집을 CRAWL_RUN_LIMIT(기본 500)건 단위로 끊고, 한도에 닿으면
+ * CRAWL_RUN_PAUSE_MS(기본 10분) 휴식한다 (502건 연속 수집 시 봇 차단 실측).
+ * 반환값 > 0 이면 "휴식 중" — 호출부가 메시지를 그 시간만큼 지연 재적재하고 처리를 건너뛴다.
+ * 상태는 DB 싱글턴 행(crawl_pacing)이라 Functions 재시작·다중 인스턴스에도 유지된다.
+ */
+async function crawlPacingGate(deps: HandlerDeps): Promise<number> {
+  const { pool, env } = deps;
+  const limit = env.CRAWL_RUN_LIMIT;
+  const { rows } = await pool.query<{ window_count: number; pause_until: Date | null }>(
+    'select window_count, pause_until from crawl_pacing where id = 1',
+  );
+  let count = rows[0]?.window_count ?? 0;
+  const pauseUntil = rows[0]?.pause_until ? new Date(rows[0].pause_until).getTime() : null;
+  const now = Date.now();
+
+  if (pauseUntil && now < pauseUntil) return pauseUntil - now; // 휴식 중 → 지연 재적재
+  if (pauseUntil) count = 0; // 휴식 종료 → 새 윈도우
+
+  count += 1;
+  // 이 건이 한도의 마지막이면 지금부터 휴식 시작 (이 건 자체는 처리)
+  const newPause = count >= limit ? new Date(now + env.CRAWL_RUN_PAUSE_MS) : null;
+  await pool.query(
+    `insert into crawl_pacing (id, window_count, pause_until) values (1, $1, $2)
+     on conflict (id) do update set window_count = $1, pause_until = $2`,
+    [count >= limit ? 0 : count, newPause],
+  );
+  return 0;
+}
+
+/**
  * 상세 수집기 (순수 핸들러). 큐 메시지 1건을 처리한다.
  * SerpApi 상세 조회 → YouTube video ID 파싱 → 썸네일 Blob 저장 → creative_id upsert.
  * 예외를 던지면 Queue Trigger 가 재시도(최대 5회) 후 포이즌 큐로 이동시킨다.
  */
 export async function collectAdDetail(deps: HandlerDeps, msg: NewAdQueueMessage): Promise<void> {
   const { ads, blob, repos, quota, env } = deps;
+
+  // 크롤 페이싱 — 500건 단위로 끊고 10분 휴식 (휴식 중 메시지는 지연 재적재 후 자동 재개)
+  if (env.ADS_SOURCE === 'crawl' && env.CRAWL_RUN_LIMIT > 0) {
+    const deferMs = await crawlPacingGate(deps);
+    if (deferMs > 0) {
+      await deps.queue.enqueue(env.AD_QUEUE_NAME, msg, { visibilityTimeoutMs: deferMs });
+      return;
+    }
+  }
 
   if (!quota.canCall()) {
     // 쿼터 소진: 다음 주기에 재수집되도록 예외로 반환(재시도 대상)

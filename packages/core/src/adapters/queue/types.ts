@@ -11,7 +11,8 @@ export interface QueueMessage<T> {
  * 로컬(Azurite)↔Azure 전환은 연결 문자열만 다르다.
  */
 export interface QueueClient {
-  enqueue<T>(queue: string, body: T): Promise<void>;
+  /** opts.visibilityTimeoutMs: 이 시간 동안 메시지를 숨겼다가 소비 가능하게 함 (지연 재적재용) */
+  enqueue<T>(queue: string, body: T, opts?: { visibilityTimeoutMs?: number }): Promise<void>;
   receive<T>(queue: string, max?: number): Promise<QueueMessage<T>[]>;
   delete(queue: string, m: { id: string; popReceipt: string }): Promise<void>;
 }

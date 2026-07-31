@@ -101,3 +101,69 @@ describe('collectAdDetail', () => {
     expect(repos.upserts).toHaveLength(0);
   });
 });
+
+describe('크롤 페이싱 (500건 단위 + 10분 휴식)', () => {
+  function pacingDeps(state: { window_count: number; pause_until: Date | null } | null, over: Partial<Record<string, unknown>> = {}) {
+    const queries: Array<{ sql: string; params?: unknown[] }> = [];
+    const enqueues: Array<{ queue: string; body: unknown; opts?: { visibilityTimeoutMs?: number } }> = [];
+    const repos = detailRepos();
+    const deps = makeDeps({ ads: new FakeDetailSource(videoDetail), blob: new FakeBlob(), repos: repos as never });
+    (deps as never as { env: Record<string, unknown> }).env = {
+      AD_QUEUE_NAME: 'new-ads',
+      BLOB_CONTAINER: 'thumbnails',
+      ADS_SOURCE: 'crawl',
+      CRAWL_RUN_LIMIT: 3,
+      CRAWL_RUN_PAUSE_MS: 600_000,
+      ...over,
+    };
+    (deps as never as { pool: unknown }).pool = {
+      query: async (sql: string, params?: unknown[]) => {
+        queries.push({ sql, params });
+        if (sql.startsWith('select')) return { rows: state ? [state] : [] };
+        return { rows: [] };
+      },
+    };
+    (deps as never as { queue: unknown }).queue = {
+      enqueue: async (queue: string, body: unknown, opts?: { visibilityTimeoutMs?: number }) => {
+        enqueues.push({ queue, body, opts });
+      },
+    };
+    return { deps, queries, enqueues, repos };
+  }
+
+  it('휴식 중이면 처리하지 않고 남은 시간만큼 지연 재적재', async () => {
+    const { deps, enqueues, repos } = pacingDeps({ window_count: 0, pause_until: new Date(Date.now() + 300_000) });
+    await collectAdDetail(deps, msg);
+    expect(repos.upserts).toHaveLength(0); // 처리 건너뜀
+    expect(enqueues).toHaveLength(1);
+    expect(enqueues[0]!.queue).toBe('new-ads');
+    expect(enqueues[0]!.opts!.visibilityTimeoutMs).toBeGreaterThan(290_000); // ≈ 남은 휴식
+  });
+
+  it('한도(3건째) 도달 시 해당 건은 처리하고 휴식을 예약', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from('J'), { status: 200 })));
+    const { deps, queries, repos } = pacingDeps({ window_count: 2, pause_until: null });
+    await collectAdDetail(deps, msg);
+    expect(repos.upserts).toHaveLength(1); // 3건째 자체는 처리
+    const upd = queries.find((q) => q.sql.startsWith('insert into crawl_pacing'));
+    expect(upd!.params![1]).toBeInstanceOf(Date); // pause_until 설정됨
+  });
+
+  it('휴식이 끝났으면 새 윈도우로 정상 처리', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from('J'), { status: 200 })));
+    const { deps, queries, repos } = pacingDeps({ window_count: 0, pause_until: new Date(Date.now() - 1000) });
+    await collectAdDetail(deps, msg);
+    expect(repos.upserts).toHaveLength(1);
+    const upd = queries.find((q) => q.sql.startsWith('insert into crawl_pacing'));
+    expect(upd!.params![0]).toBe(1); // 새 윈도우 1건째
+    expect(upd!.params![1]).toBeNull();
+  });
+
+  it('serpapi 소스는 페이싱 미적용', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from('J'), { status: 200 })));
+    const { deps, queries, repos } = pacingDeps(null, { ADS_SOURCE: 'serpapi' });
+    await collectAdDetail(deps, msg);
+    expect(repos.upserts).toHaveLength(1);
+    expect(queries).toHaveLength(0); // 페이싱 쿼리 자체가 없음
+  });
+});
