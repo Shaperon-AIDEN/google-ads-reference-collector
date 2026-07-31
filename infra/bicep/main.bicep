@@ -149,6 +149,7 @@ resource funcApp 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'COLLECT_FORMATS', value: 'all' }
         { name: 'CRAWL_THROTTLE_MS', value: '1500' }
         { name: 'AD_QUEUE_NAME', value: 'new-ads' }
+        { name: 'COLLECT_QUEUE_NAME', value: 'collect-requests' }
         { name: 'BLOB_CONTAINER', value: 'thumbnails' }
         { name: 'QUOTA_MONTHLY_BUDGET', value: '5000' }
         { name: 'QUOTA_THROTTLE_PCT', value: '0.8' }
