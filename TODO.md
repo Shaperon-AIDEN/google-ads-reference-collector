@@ -172,11 +172,13 @@
 - [x] Azure PostgreSQL 스키마 마이그레이션 0000~0007 적용 (8개 테이블 확인. ⚠️ `azure.extensions=PGCRYPTO` 서버 파라미터 선행 필요 — 실측)
 - [x] DB 방화벽: Azure 서비스 + 개발 IP 등록
 
-## Phase 5 — Azure 배포·안정화
+## Phase 5 — Azure 배포·안정화 (진행 중)
 
-- [ ] GitHub Actions 파이프라인 구성 (main → Functions·App Service 자동 배포)
-- [ ] Functions 배포 및 Timer/Queue Trigger 동작 확인
-- [ ] Next.js 대시보드 App Service 배포
+- [x] **로컬 데이터 이관** — 광고 4,883(신규 4,525·병합 358)·지표 4,777·대안 4,485·회원/즐겨찾기, advertiser_id/creative_id 매핑·빈 필드만 채우는 비파괴 병합 (`scripts/migrate-data-to-azure.mts`)
+
+- [x] GitHub Actions 파이프라인 구성 (main → Functions·App Service 자동 배포) — deploy.yml, publish profile 시크릿. Functions 는 번들+@azure/functions 실물 포함 필요(실측)
+- [x] Functions 배포 및 Timer/Queue Trigger 동작 확인 — 크롤 E2E(더스크랙 5건·아이리스 373건), 이어달리기·500건 페이싱 실동작. ⚠️ Azure IP 대량 크롤은 차단됨(실측) → 대량 초기 수집은 확장, Azure 는 증분·조회수 담당
+- [x] Next.js 대시보드 App Service 배포 — standalone 출력, 진행상황 API 포함
 - [ ] Entra ID 앱 등록 + App Service Easy Auth 연결, 접근 허용 그룹 지정
 - [ ] Application Insights 커스텀 메트릭(신규 광고 수·API 호출 수) 기록
 - [ ] Azure Monitor 경보 (연속 실패·쿼터 80%) → 이메일/Slack/Teams
