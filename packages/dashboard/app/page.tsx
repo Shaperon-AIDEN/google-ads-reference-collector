@@ -122,6 +122,7 @@ export default async function ReferenceListPage({
     from?: string;
     to?: string;
     fav?: string;
+    page?: string;
   };
 }) {
   const sort = (searchParams.sort as AdSort) ?? 'newest';
@@ -138,6 +139,7 @@ export default async function ReferenceListPage({
   const user = await getSessionUser();
   const favIds = user ? await listFavoriteAdIds(user.id) : [];
   const favOnly = searchParams.fav === '1' && !!user;
+  const page = Math.max(1, Number(searchParams.page) || 1);
 
   const qs = (patch: Record<string, string>) => {
     const base: Record<string, string> = { sort };
@@ -148,6 +150,7 @@ export default async function ReferenceListPage({
     if (from) base.from = from;
     if (to) base.to = to;
     if (favOnly) base.fav = '1';
+    if (page > 1) base.page = String(page);
     const p = new URLSearchParams({ ...base, ...patch });
     // 빈 값 제거
     for (const [k, v] of [...p.entries()]) if (!v) p.delete(k);
@@ -221,6 +224,7 @@ export default async function ReferenceListPage({
           favIds={favIds}
           favOnly={favOnly}
           loggedIn={!!user}
+          page={page}
         />
       )}
     </>
@@ -279,6 +283,7 @@ async function GroupedView({
   favIds,
   favOnly,
   loggedIn,
+  page,
 }: {
   sort: AdSort;
   competitor?: string;
@@ -291,7 +296,10 @@ async function GroupedView({
   favIds: string[];
   favOnly: boolean;
   loggedIn: boolean;
+  page: number;
 }) {
+  // 페이지네이션 — 100건씩. 즐겨찾기 필터는 후처리 필터라 페이지 없이 넉넉히 조회.
+  const PAGE = 100;
   const allAds = await listAds({
     sort,
     competitorId: competitor || undefined,
@@ -299,9 +307,13 @@ async function GroupedView({
     minViews,
     from,
     to,
+    limit: favOnly ? 2000 : PAGE + 1, // +1 = 다음 페이지 유무 판별
+    offset: favOnly ? 0 : (page - 1) * PAGE,
   });
   const favSet = new Set(favIds);
-  const ads = favOnly ? allAds.filter((a) => favSet.has(a.id)) : allAds;
+  const hasNext = !favOnly && allAds.length > PAGE;
+  const pageAds = favOnly ? allAds : allAds.slice(0, PAGE);
+  const ads = favOnly ? pageAds.filter((a) => favSet.has(a.id)) : pageAds;
 
   const byCompetitor = new Map<string, { name: string; ads: AdCard[] }>();
   for (const ad of ads) {
@@ -358,6 +370,13 @@ async function GroupedView({
         })()}
       </div>
 
+      {(page > 1 || hasNext) && (
+        <div className="toolbar" style={{ justifyContent: 'center', gap: 16 }}>
+          {page > 1 && <Link href={qs({ page: String(page - 1) })}><span className="badge">← 이전</span></Link>}
+          <span className="muted">페이지 {page}</span>
+          {hasNext && <Link href={qs({ page: String(page + 1) })}><span className="badge">다음 →</span></Link>}
+        </div>
+      )}
       {groups.length === 0 ? (
         <div className="empty">
           조건에 맞는 광고가 없습니다. <Link href="/competitors">경쟁사</Link>를 등록하고 "지금 수집"을 실행하세요.
