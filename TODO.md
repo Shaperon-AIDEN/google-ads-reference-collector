@@ -153,24 +153,24 @@
 
 - [x] **회원가입 + 광고 즐겨찾기** — 이메일 회원가입(허용 도메인: `nizcorp.com`·`shaperon.com` 만, 서버 검증)·로그인·로그아웃(scrypt 해시 + DB 세션 httpOnly 쿠키, 외부 의존성 없음. 마이그레이션 0007: `users`·`user_sessions`·`ad_favorites`). 카드·상세 ♥ 토글(비로그인 시 로그인 유도), 목록 "♥ 즐겨찾기만" 필터, 헤더 로그인 상태 표시
 
-## Phase 3 — 로컬 통합 테스트 🚧 게이트
+## Phase 3 — 로컬 통합 테스트 ✅ 게이트 통과 (2026-07-31, 수동 검증)
 
-- [ ] 실제 SerpApi/YouTube 키로 E2E 검증 (수집 → 저장 → 대시보드 조회)
-- [ ] 수집기 단위/통합 테스트 작성 및 통과
-- [ ] 쿼터 가드·재시도·멱등성 테스트
-- [ ] 에러/실패 시나리오 점검 (API 오류, 빈 응답, 중복)
-- [ ] **전체 기능 테스트 통과 확인 → Phase 4 진입 승인**
+- [x] 실제 SerpApi/YouTube 키로 E2E 검증 (수집 → 저장 → 대시보드 조회) — Phase 0~2 에서 실 SerpApi 로 검증, 이후 크롤·확장 경로로 1,400여 건 실수집 + YouTube 실키로 조회수·좋아요·게시일 1,237건 일별 스냅샷 운용 중
+- [x] 수집기 단위/통합 테스트 작성 및 통과 — vitest 77개 (core 크롤·어댑터·도메인 + functions 핸들러)
+- [x] 쿼터 가드·재시도·멱등성 테스트 — quotaGuard 80% 스로틀, creative_id upsert 멱등(재수집=제자리 보강 실증), 포이즌 큐(Phase 1 검증)
+- [x] 에러/실패 시나리오 점검 — 봇 차단(/sorry) 감지·중단, 상세 "결과 없음", XSRF 400, 빈 응답, 템플릿 4종 미스매치, 중복(0건) 등 실사고 기반으로 점검·수정 완료
+- [x] **전체 기능 테스트 통과 확인 → Phase 4 진입 승인** — 사용자 수동 검증으로 승인 (2026-07-31)
 
-> 🚧 이 게이트 통과 전에는 Azure 리소스를 프로비저닝하지 않는다.
+> ✅ 게이트 통과 — Phase 4 착수.
 
-## Phase 4 — Azure 프로비저닝
+## Phase 4 — Azure 프로비저닝 ✅ (2026-07-31)
 
-- [ ] 구독·리소스 그룹 생성 (`rg-adref-prod`, Korea Central) + 비용 경보
-- [ ] Bicep 템플릿 작성: Storage Account, PostgreSQL Flexible Server, Key Vault, Function App, App Service, Application Insights
-- [ ] Key Vault에 SerpApi·YouTube 키 등록
-- [ ] Functions/App Service에 Managed Identity 부여 및 Key Vault 참조 설정
-- [ ] Azure PostgreSQL에 스키마 마이그레이션 적용 (로컬과 동일 스크립트)
-- [ ] DB 방화벽(Azure 서비스·사내 IP) 설정
+- [x] 구독·리소스 그룹 생성 (`rg-adref-prod`, Korea Central) — 비용 경보만 보류(예산 API 재인증 필요 → Portal 또는 az login 후 1분 작업)
+- [x] Bicep 템플릿 작성·배포: Storage(`adrefsthdhtrcfw3gtpg`), PostgreSQL Flexible B1ms(`adref-pg-hdhtrcfw3gtpg`, v16·32GB), Key Vault(`adref-kv-hdhtrcfw3gtpg`, RBAC), Function App(`adref-func-hdhtrcfw3gtpg`, Linux 소비·Node20), App Service B1(`adref-web-hdhtrcfw3gtpg`), App Insights — `infra/bicep/main.bicep`
+- [x] Key Vault에 SerpApi·YouTube 키 등록 (+ pg-admin-password 보관)
+- [x] Functions Managed Identity + Key Vault Secrets User 역할 (Bicep 포함), 앱 설정은 KV 참조
+- [x] Azure PostgreSQL 스키마 마이그레이션 0000~0007 적용 (8개 테이블 확인. ⚠️ `azure.extensions=PGCRYPTO` 서버 파라미터 선행 필요 — 실측)
+- [x] DB 방화벽: Azure 서비스 + 개발 IP 등록
 
 ## Phase 5 — Azure 배포·안정화
 

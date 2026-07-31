@@ -129,3 +129,9 @@
 - **전송은 curl 서브프로세스**: Google 은 Node(undici·https)의 TLS 시그니처를 봇으로 탐지·차단하므로, `execFile('curl', [...])`(셸 미경유·인젝션 안전)로 호출한다. curl 은 dev(macOS)·Azure App Service(Linux)에 기본 포함. 테스트는 `transport` 주입으로 파서만 검증.
 - **비공식:** 브라우저 헤더(user-agent·origin·referer) 필요. 여전히 best-effort — 확정 경로는 도메인 검색(SerpApi).
 - **Azurite:** Azure SDK 최신 API 버전 미지원 시 `--skipApiVersionCheck` 필요 (docker-compose 반영됨).
+
+## Azure 운영 (Phase 4 프로비저닝 완료, 2026-07-31)
+
+- 리소스: `rg-adref-prod`(Korea Central) — PG `adref-pg-hdhtrcfw3gtpg`(B1ms·v16), KV `adref-kv-hdhtrcfw3gtpg`(시크릿: serpapi-key·youtube-api-key·pg-admin-password), Functions `adref-func-hdhtrcfw3gtpg`, Web `adref-web-hdhtrcfw3gtpg`, Storage `adrefsthdhtrcfw3gtpg`. IaC 는 `infra/bicep/main.bicep`.
+- **Azure PG 는 `azure.extensions=PGCRYPTO` 서버 파라미터를 켜야 pgcrypto 확장 생성 가능**(실측 — 없으면 마이그레이션 0000 실패).
+- Azure Functions 의 `ADS_SOURCE` 기본은 `serpapi` — 데이터센터 IP 는 투명성 센터 크롤이 차단되기 쉬움. 확장 수집은 팝업 백엔드 주소를 Functions URL 로 바꿔 병행.

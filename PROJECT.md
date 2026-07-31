@@ -8,7 +8,7 @@
 - **인프라:** Microsoft Azure (서버리스 우선 + 관리형 PostgreSQL)
 - **리소스 그룹 / 리전:** `rg-adref-prod` / Korea Central
 - **진행 방식:** **로컬 우선 구현 → 전체 기능 테스트 완료 → Azure 배포** (아래 0장 참조)
-- **현재 진행:** Phase 2 (대시보드 MVP) 구현 — Phase 1(수집 파이프라인) 실 API E2E·Functions 런타임·포이즌 큐 검증 완료. Phase 2 에서 `@adref/dashboard`(Next.js 14) 구축: **경쟁사 온보딩**(도메인→광고주 탐색→등록→수집 연계, §4.5), 레퍼런스 리스트·상세·수집 현황 화면을 로컬 라이브 DB·실 SerpApi 로 검증. 상세는 [TODO.md](./TODO.md). 확정 기술 스택은 [CLAUDE.md](./CLAUDE.md).
+- **현재 진행:** **Phase 5 (Azure 배포·안정화)** — Phase 3 게이트 수동 검증 통과(2026-07-31), Phase 4 프로비저닝 완료: `rg-adref-prod`(Korea Central) 에 Storage·PostgreSQL Flexible B1ms·Key Vault·Function App(소비)·App Service B1·App Insights 배포, 스키마 마이그레이션 적용. 남은 것: 코드 배포(Functions 번들·Next.js), 데이터 이관, Phase 5 체크리스트. (이전 기록) Phase 2 (대시보드 MVP) 구현 — Phase 1(수집 파이프라인) 실 API E2E·Functions 런타임·포이즌 큐 검증 완료. Phase 2 에서 `@adref/dashboard`(Next.js 14) 구축: **경쟁사 온보딩**(도메인→광고주 탐색→등록→수집 연계, §4.5), 레퍼런스 리스트·상세·수집 현황 화면을 로컬 라이브 DB·실 SerpApi 로 검증. 상세는 [TODO.md](./TODO.md). 확정 기술 스택은 [CLAUDE.md](./CLAUDE.md).
 
 ---
 
