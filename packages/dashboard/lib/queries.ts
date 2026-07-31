@@ -88,13 +88,15 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
 
   // 최신순 = 영상 게시일(publishedAt) 기준. 없으면 게재 시작일 → 수집 시각 폴백.
   const recencySql = sql`coalesce(${ads.publishedAt}, ${ads.firstShown}::timestamptz, ${ads.collectedAt})`;
+  // ⚠️ Postgres 는 DESC 정렬 시 NULL 이 맨 위로 온다(NULLS FIRST 기본) — 지표 없는 광고는
+  //    맨 아래로 보낸다 (좋아요 비공개 영상·스냅샷 미확보 등).
   const order =
     filter.sort === 'views'
-      ? desc(latestViewsSql)
+      ? sql`${latestViewsSql} desc nulls last`
       : filter.sort === 'likes'
-        ? desc(latestLikesSql)
+        ? sql`${latestLikesSql} desc nulls last`
         : filter.sort === 'duration'
-          ? desc(ads.daysShown)
+          ? sql`${ads.daysShown} desc nulls last`
           : desc(recencySql);
 
   const rows = await db()
