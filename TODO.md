@@ -163,14 +163,14 @@
 
 > ✅ 게이트 통과 — Phase 4 착수.
 
-## Phase 4 — Azure 프로비저닝
+## Phase 4 — Azure 프로비저닝 ✅ (2026-07-31)
 
-- [ ] 구독·리소스 그룹 생성 (`rg-adref-prod`, Korea Central) + 비용 경보
-- [ ] Bicep 템플릿 작성: Storage Account, PostgreSQL Flexible Server, Key Vault, Function App, App Service, Application Insights
-- [ ] Key Vault에 SerpApi·YouTube 키 등록
-- [ ] Functions/App Service에 Managed Identity 부여 및 Key Vault 참조 설정
-- [ ] Azure PostgreSQL에 스키마 마이그레이션 적용 (로컬과 동일 스크립트)
-- [ ] DB 방화벽(Azure 서비스·사내 IP) 설정
+- [x] 구독·리소스 그룹 생성 (`rg-adref-prod`, Korea Central) — 비용 경보만 보류(예산 API 재인증 필요 → Portal 또는 az login 후 1분 작업)
+- [x] Bicep 템플릿 작성·배포: Storage(`adrefsthdhtrcfw3gtpg`), PostgreSQL Flexible B1ms(`adref-pg-hdhtrcfw3gtpg`, v16·32GB), Key Vault(`adref-kv-hdhtrcfw3gtpg`, RBAC), Function App(`adref-func-hdhtrcfw3gtpg`, Linux 소비·Node20), App Service B1(`adref-web-hdhtrcfw3gtpg`), App Insights — `infra/bicep/main.bicep`
+- [x] Key Vault에 SerpApi·YouTube 키 등록 (+ pg-admin-password 보관)
+- [x] Functions Managed Identity + Key Vault Secrets User 역할 (Bicep 포함), 앱 설정은 KV 참조
+- [x] Azure PostgreSQL 스키마 마이그레이션 0000~0007 적용 (8개 테이블 확인. ⚠️ `azure.extensions=PGCRYPTO` 서버 파라미터 선행 필요 — 실측)
+- [x] DB 방화벽: Azure 서비스 + 개발 IP 등록
 
 ## Phase 5 — Azure 배포·안정화
 
