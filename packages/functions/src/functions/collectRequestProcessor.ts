@@ -15,7 +15,7 @@ export async function collectRequestProcessor(
   const msg = message as CollectRequestMessage;
   const deps = await buildDeps();
   try {
-    const result = await collectForCompetitor(deps, msg.competitorId, { maxTotal: msg.maxTotal });
+    const result = await collectForCompetitor(deps, msg.competitorId, { maxTotal: msg.maxTotal, pageToken: msg.pageToken });
     context.log(`[collectRequestProcessor] ${result.competitor} new=${result.newAds} inline=${result.processedInline}`);
   } finally {
     await deps.close();

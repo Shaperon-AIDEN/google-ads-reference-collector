@@ -52,4 +52,7 @@ export interface AdPeriod {
 export interface CollectRequestMessage {
   competitorId: string;
   maxTotal?: number;
+  /** 이어달리기(continuation) — 목록 순회가 시간예산을 넘기면 진행 지점을 담아 재적재한다.
+   *  (Consumption 플랜 함수 타임아웃 대응: 172페이지 순회가 한 실행에 못 끝남, 실측) */
+  pageToken?: string;
 }
