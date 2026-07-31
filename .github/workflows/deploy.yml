@@ -43,12 +43,17 @@ jobs:
       - run: pnpm -C packages/core build
       # esbuild 단일 번들 (pg 포함, pnpm 심링크 회피) → dist/index.js
       - run: pnpm -C packages/functions build
-      # 배포 패키지: host.json + package.json + dist (node_modules 불필요 — 번들에 포함)
+      # 배포 패키지: host.json + 최소 package.json + dist + node_modules(@azure/functions 만).
+      # 번들은 pg 까지 포함하지만 @azure/functions 는 external(v4 워커 연동) — 패키지에 실물 설치 필요.
+      # 원본 package.json 은 workspace:* 의존이 있어 npm install 이 실패하므로 최소본을 생성한다.
       - name: Stage package
         run: |
           mkdir -p /tmp/funcpkg
-          cp packages/functions/host.json packages/functions/package.json /tmp/funcpkg/
+          cp packages/functions/host.json /tmp/funcpkg/
           cp -r packages/functions/dist /tmp/funcpkg/dist
+          AZFUNC_VER=$(node -p "require('./packages/functions/package.json').dependencies['@azure/functions']")
+          node -e "require('fs').writeFileSync('/tmp/funcpkg/package.json', JSON.stringify({name:'adref-functions',version:'0.0.0',type:'module',main:'dist/index.js',dependencies:{'@azure/functions':'$AZFUNC_VER'}},null,2))"
+          cd /tmp/funcpkg && npm install --omit=dev --no-audit --no-fund
       - uses: Azure/functions-action@v1
         with:
           app-name: ${{ env.FUNCTIONAPP_NAME }}
