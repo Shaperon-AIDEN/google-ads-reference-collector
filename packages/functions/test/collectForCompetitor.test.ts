@@ -98,4 +98,44 @@ describe('collectForCompetitor', () => {
     expect(res.throttled).toBe(true);
     expect(res.newAds).toBe(0);
   });
+
+
+  it('시간예산 초과 시 진행 지점(pageToken)을 이어달리기 메시지로 재적재', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from('J'), { status: 200 })));
+    const queue = new FakeQueue();
+    const r = repos();
+    // 2페이지 소스 — 1페이지 처리 후 예산(0ms) 초과 → 2페이지는 continuation 으로
+    const paged = {
+      name: 'fake',
+      async listAds(p: { pageToken?: string }) {
+        return p.pageToken
+          ? { items: [listItem('B')], apiCalls: 0 }
+          : { items: [listItem('A')], nextPageToken: 'TOK2', apiCalls: 0 };
+      },
+      async getAdDetail() {
+        return { detail, apiCalls: 0 };
+      },
+      async searchAdvertisersByDomain() {
+        return { candidates: [], apiCalls: 0 };
+      },
+    };
+    const deps = makeDeps({ ads: paged as never, queue, blob: new FakeBlob(), repos: r as never });
+
+    const res = await collectForCompetitor(deps, 'c1', { maxInline: 0, budgetMs: 0 });
+
+    expect(res.continued).toBe(true);
+    expect(res.newAds).toBe(1); // 1페이지(A)만 처리
+    const cont = queue.messages.find((m) => m.queue === 'collect-requests');
+    expect(cont).toBeTruthy();
+    expect((cont!.body as { pageToken?: string }).pageToken).toBe('TOK2'); // 진행 지점 보존
+
+    // 이어달리기 실행 — pageToken 부터 재개, 인라인 없이 큐 적재만
+    const res2 = await collectForCompetitor(deps, 'c1', {
+      pageToken: (cont!.body as { pageToken: string }).pageToken,
+      budgetMs: 60_000,
+    });
+    expect(res2.continued).toBe(false);
+    expect(res2.newAds).toBe(1); // 2페이지(B)
+    expect(res2.processedInline).toBe(0); // 이어달리기 청크는 인라인 생략
+  });
 });

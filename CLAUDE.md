@@ -99,6 +99,7 @@
 - 백엔드 엔드포인트(`packages/functions/src/functions/ingestHttp.ts`, CORS 허용): `POST /api/ingest`(저장), `POST /api/known`(기존 creative_id), `GET /api/advertisers`(경쟁사 목록). 저장 핸들러 `ingestCreatives` 는 collectAdDetail 의 저장 계층 재사용 — creative_id 멱등 upsert + (비디오면)YouTube 조회수/좋아요/게시일 스냅샷(서버 측, 무료). 저장 스코프는 `COLLECT_FORMATS` 따름(확장은 전체 전송, 백엔드가 필터).
 - 사용법·설치는 `tools/chrome-extension/README.md`. 요청 간격(delay)·차단 감지 자동 중단 내장.
 - **연속 수집 한도(2026-07-31 실측):** 확장으로 한 번에 502건 연속 상세 수집 시 봇 차단됨 → 한 실행의 상세 수집을 `maxPerRun`(팝업 "연속 한도", 기본 500)으로 제한. `/known` 이 수집분을 걸러 다음 실행에서 이어서 수집(중단 지점 저장 불필요).
+- **Consumption 타임아웃 대응(이어달리기, 2026-07-31 실측):** Azure 소비 플랜의 함수 타임아웃(기본 5분→host.json 에서 10분)에 대형 광고주 목록 순회(172페이지 ≈ 7~9분)가 걸려 죽는다. `collectForCompetitor` 는 페이지 단위 스트리밍 처리 + **시간예산(4분) 초과 시 진행 지점(pageToken)을 collect-requests 큐에 재적재**해 다음 실행이 이어받는다(이어달리기 청크는 인라인 상세 생략).
 - **서버 크롤 페이싱:** 상세 수집기(큐)가 `CRAWL_RUN_LIMIT`(기본 500)건마다 `CRAWL_RUN_PAUSE_MS`(기본 10분) 휴식 — "500건 넘으면 끊어서 수집" 개념(정기 타이머 12시간 간격과 별개). 상태는 DB 싱글턴 `crawl_pacing`(마이그레이션 0008), 휴식 중 메시지는 visibility timeout 으로 지연 재적재 후 자동 재개. serpapi 소스에는 미적용.
 - **예약 자동 수집(chrome.alarms)은 구현 후 원복됨(2026-07-31):** 로컬 Chrome 프로필에 의존하는 스케줄러라 운영이 Azure 로 이전하면 무용하다는 판단. 자동화가 다시 필요하면 Azure 측(서버 크롤 Timer 또는 별도 브라우저 워커)에서 설계할 것 — 당시 구현은 PR #70/#71 참조.
 

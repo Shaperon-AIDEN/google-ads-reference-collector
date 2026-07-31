@@ -158,7 +158,7 @@ export function viewCountRepos(targets: Array<{ id: string; youtubeVideoId: stri
 /** 테스트용 HandlerDeps 조립 (필요한 부분만 채우고 나머지는 캐스팅) */
 export function makeDeps(partial: Partial<HandlerDeps> & { quota?: QuotaGuard }): HandlerDeps {
   return {
-    env: { AD_QUEUE_NAME: 'new-ads', BLOB_CONTAINER: 'thumbnails' },
+    env: { AD_QUEUE_NAME: 'new-ads', COLLECT_QUEUE_NAME: 'collect-requests', BLOB_CONTAINER: 'thumbnails' },
     quota: partial.quota ?? new QuotaGuard({ monthlyBudget: 5000, throttlePct: 0.8 }),
     youtube: partial.youtube ?? new FakeYouTube([]), // 기본 빈 통계 (조회수 미확보)
     ...partial,
