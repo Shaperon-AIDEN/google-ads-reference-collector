@@ -29,7 +29,8 @@
     </div>
     <div class="row">
       <div><label>저장 단위(건)</label><input id="flushEvery" type="number" value="5" title="이 건수마다 DB에 저장. 1이면 상세 수집마다 저장" /></div>
-      <div><label>연속 한도(건)</label><input id="maxPerRun" type="number" value="500" title="한 실행에서 상세 수집할 최대 건수(전 광고주 합산). 500건 연속 수집 시 봇 차단 실측 — 나머지는 다음 실행에서 이어서" /></div>
+      <div><label>연속 한도(건)</label><input id="maxPerRun" type="number" value="500" title="이 건수마다 끊어서 휴식. 500건 연속 수집 시 봇 차단 실측" /></div>
+      <div><label>재개 간격(분)</label><input id="restMin" type="number" value="10" title="연속 한도 도달 시 이만큼 쉬었다가 자동 재개 (0=자동 재개 없이 중단)" /></div>
     </div>
 
     <div class="row" style="margin-top:8px">
