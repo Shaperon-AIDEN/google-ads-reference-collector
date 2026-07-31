@@ -178,11 +178,13 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'NODE|20-lts'
-      appCommandLine: 'node server.js' // Next.js standalone 출력 기준 (배포 파이프라인에서 구성)
+      appCommandLine: 'node packages/dashboard/server.js' // Next.js standalone (모노레포 경로)
       appSettings: [
         { name: 'DATABASE_URL', value: pgConn }
         { name: 'COLLECT_FORMATS', value: 'all' }
         { name: 'AUTH_MODE', value: 'mock' } // 자체 회원가입/세션 사용 — Easy Auth 도입 시 entra
+        { name: 'HOSTNAME', value: '0.0.0.0' }
+        { name: 'FUNCTIONS_BASE_URL', value: 'https://${funcApp.properties.defaultHostName}/api' }
         { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
       ]
     }

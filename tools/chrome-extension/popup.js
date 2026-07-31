@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { ingestBase: 'http://localhost:7071/api', num: 40, delayMs: 3000, region: 'KR', flushEvery: 5 };
+const DEFAULTS = { ingestBase: 'http://localhost:7071/api', num: 40, delayMs: 3000, region: 'KR', flushEvery: 5, maxPerRun: 500 };
 
 function log(msg) {
   const el = $('log');
@@ -15,6 +15,7 @@ chrome.storage.local.get(['cfg'], ({ cfg }) => {
   $('delayMs').value = c.delayMs;
   $('region').value = c.region;
   $('flushEvery').value = c.flushEvery;
+  $('maxPerRun').value = c.maxPerRun;
 });
 function readCfg() {
   const cfg = {
@@ -23,6 +24,8 @@ function readCfg() {
     delayMs: Number($('delayMs').value) || 3000,
     region: $('region').value.trim() || 'KR',
     flushEvery: Number($('flushEvery').value) || 5,
+    // 한 실행의 상세 수집 한도 (전 광고주 합산) — 502건 연속 수집 시 봇 차단 실측 → 기본 500
+    maxPerRun: Number($('maxPerRun').value) > 0 ? Number($('maxPerRun').value) : 500,
   };
   chrome.storage.local.set({ cfg });
   return cfg;
@@ -92,7 +95,7 @@ chrome.runtime.onMessage.addListener((msg) => {
       else {
         const saved = r.saved ? (r.saved.saved ?? '?') : 0;
         const err = r.saved && r.saved.error ? ` (일부 저장실패: ${r.saved.error})` : '';
-        log(`  ${r.advertiserId}: 전체 ${r.total} / 신규 ${r.fresh} / 저장 ${saved}${r.blocked ? ' [차단중단]' : ''}${err}`);
+        log(`  ${r.advertiserId}: 전체 ${r.total} / 신규 ${r.fresh} / 저장 ${saved}${r.blocked ? ' [차단중단]' : ''}${r.limited ? ' [한도도달]' : ''}${err}`);
       }
     }
   } else {

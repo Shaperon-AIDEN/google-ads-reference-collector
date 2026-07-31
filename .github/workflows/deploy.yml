@@ -1,0 +1,89 @@
+# main 병합 시 Azure 자동 배포 — 수집기(Function App) + 대시보드(App Service)
+# 시크릿: AZURE_FUNCTIONAPP_PUBLISH_PROFILE / AZURE_WEBAPP_PUBLISH_PROFILE (publish profile XML)
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FUNCTIONAPP_NAME: adref-func-hdhtrcfw3gtpg
+  WEBAPP_NAME: adref-web-hdhtrcfw3gtpg
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C packages/core build
+      - run: pnpm -w run test -- --run
+
+  deploy-functions:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C packages/core build
+      # esbuild 단일 번들 (pg 포함, pnpm 심링크 회피) → dist/index.js
+      - run: pnpm -C packages/functions build
+      # 배포 패키지: host.json + package.json + dist (node_modules 불필요 — 번들에 포함)
+      - name: Stage package
+        run: |
+          mkdir -p /tmp/funcpkg
+          cp packages/functions/host.json packages/functions/package.json /tmp/funcpkg/
+          cp -r packages/functions/dist /tmp/funcpkg/dist
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.FUNCTIONAPP_NAME }}
+          package: /tmp/funcpkg
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+
+  deploy-dashboard:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C packages/core build
+      # 빌드 시 DB 접속은 없지만 env 검증(zod)이 값 존재를 요구 → 더미 주입
+      - run: pnpm -C packages/dashboard build
+        env:
+          DATABASE_URL: postgres://build:build@localhost:5432/build
+      # standalone 출력 + static/public 동봉 → App Service (node server.js)
+      - name: Stage package
+        run: |
+          mkdir -p /tmp/webpkg
+          cp -r packages/dashboard/.next/standalone/. /tmp/webpkg/
+          mkdir -p /tmp/webpkg/packages/dashboard/.next/static
+          cp -r packages/dashboard/.next/static/. /tmp/webpkg/packages/dashboard/.next/static/
+          if [ -d packages/dashboard/public ]; then
+            mkdir -p /tmp/webpkg/packages/dashboard/public
+            cp -r packages/dashboard/public/. /tmp/webpkg/packages/dashboard/public/
+          fi
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.WEBAPP_NAME }}
+          package: /tmp/webpkg
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
