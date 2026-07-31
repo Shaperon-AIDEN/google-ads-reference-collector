@@ -352,8 +352,10 @@ async function getDetail(advertiserId, creativeId, format) {
       idx,
       headline:
         fieldValue(r.text, 'headline') || fieldValue(r.text, 'longHeadline') || t.headline || s.headline || pla.headline,
-      description: fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text') || t.description || s.description,
-      ctaText: fieldValue(r.text, 'callToActionText') || t.ctaText,
+      // 'body'·'callToAction' 은 텍스트+로고 합성형(gpa) 템플릿의 필드명 (실측)
+      description:
+        fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text') || fieldValue(r.text, 'body') || t.description || s.description,
+      ctaText: fieldValue(r.text, 'callToActionText') || fieldValue(r.text, 'callToAction') || t.ctaText,
       logoUrl: extractLogo(r.text) || t.logoUrl,
       imageUrl: t.imageUrl || pla.imageUrl,
       landingUrl: extractLandingUrl(r.text) || t.landingUrl || s.landingUrl,

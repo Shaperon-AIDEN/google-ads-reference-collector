@@ -421,9 +421,14 @@ export class TransparencyCrawlAdsSource implements AdsSource {
           idx,
           headline:
             fieldValue(html, 'headline') ?? fieldValue(html, 'longHeadline') ?? t.headline ?? s.headline ?? pla.headline,
+          // 'body'·'callToAction' 은 텍스트+로고 합성형(gpa) 템플릿의 필드명 (실측)
           description:
-            fieldValue(html, 'description') ?? fieldValue(html, 'body_text') ?? t.description ?? s.description,
-          ctaText: fieldValue(html, 'callToActionText') ?? t.ctaText,
+            fieldValue(html, 'description') ??
+            fieldValue(html, 'body_text') ??
+            fieldValue(html, 'body') ??
+            t.description ??
+            s.description,
+          ctaText: fieldValue(html, 'callToActionText') ?? fieldValue(html, 'callToAction') ?? t.ctaText,
           logoUrl: extractLogo(html) ?? t.logoUrl,
           imageUrl: t.imageUrl ?? pla.imageUrl,
           landingUrl: extractLandingUrl(html) ?? t.landingUrl ?? s.landingUrl,

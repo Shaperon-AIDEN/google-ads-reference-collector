@@ -25,7 +25,8 @@ async function main() {
   const { rows } = await pool.query<{ id: string; creativeId: string; format: AdFormat; raw: unknown }>(
     `select id, creative_id as "creativeId", format, raw
      from ads
-     where format in ('image','text') and raw is not null and headline is null and description is null
+     where format in ('image','text') and raw is not null
+       and (headline is null or description is null or cta_text is null)
      order by collected_at desc
      ${limit ? `limit ${Math.floor(limit)}` : ''}`,
   );
