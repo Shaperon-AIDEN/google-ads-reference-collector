@@ -18,9 +18,6 @@ const UA =
 const limitArg = process.argv.indexOf('--limit');
 const limit = limitArg > -1 ? Number(process.argv[limitArg + 1]) : 0;
 
-// 백필은 저장된 raw 재처리라 수집 정책의 상세 대기(6000ms)를 적용하지 않는다
-process.env.CRAWL_DETAIL_WAIT_MS = '0';
-
 const env = loadEnv();
 const { pool } = createDb(env.DATABASE_URL);
 
