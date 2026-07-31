@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // App Service 배포용 — .next/standalone 에 server.js + 최소 node_modules 생성
+  output: 'standalone',
   // @adref/core 를 서버 번들에서 그대로 트랜스파일 (workspace 패키지)
   transpilePackages: ['@adref/core'],
   // pg 등 서버 전용 모듈은 서버 컴포넌트에서만 사용

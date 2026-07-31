@@ -400,7 +400,10 @@ async function getDetail(advertiserId, creativeId, format) {
   };
 }
 
-async function collectAdvertiser(advertiserId, cfg) {
+// runState: 이번 실행 전체(모든 광고주 합산)의 상세 수집 카운터.
+// ⚠️ 실측(2026-07-31): 한 번에 502건 연속 상세 수집 → 봇 차단. 한 실행의 상세 요청을
+// maxPerRun(기본 500)으로 제한한다 — /known 이 수집분을 걸러주므로 다음 실행에서 이어서 수집된다.
+async function collectAdvertiser(advertiserId, cfg, runState) {
   const base = cfg.ingestBase.replace(/\/$/, '');
   report({ phase: 'list', advertiserId, message: '목록 조회 중…' });
 
@@ -442,12 +445,19 @@ async function collectAdvertiser(advertiserId, cfg) {
   }
 
   let blocked = false;
+  let limited = false;
   for (let i = 0; i < fresh.length; i++) {
+    if (runState.details >= runState.maxPerRun) {
+      limited = true;
+      report({ phase: 'detail', advertiserId, message: `연속 수집 한도(${runState.maxPerRun}건) 도달 — 진행분 저장 후 중단 (다음 실행에서 이어서)` });
+      break;
+    }
     const v = fresh[i];
     try {
       const d = await getDetail(advertiserId, v.creativeId, v.format);
       buffer.push({ ...v, ...d });
       collected += 1;
+      runState.details += 1;
     } catch (e) {
       if (String(e && e.message) === 'BLOCKED') {
         blocked = true;
@@ -468,6 +478,7 @@ async function collectAdvertiser(advertiserId, cfg) {
     fresh: fresh.length,
     collected,
     blocked,
+    limited,
     saved: lastError ? { saved: savedTotal, error: lastError } : { saved: savedTotal },
   };
 }
@@ -477,9 +488,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type !== 'collect') return false;
   (async () => {
     const results = [];
+    // 이번 실행 전체의 상세 수집 한도 (모든 광고주 합산, 기본 500)
+    const runState = { details: 0, maxPerRun: Number(msg.cfg.maxPerRun) > 0 ? Number(msg.cfg.maxPerRun) : 500 };
     for (const advertiserId of msg.advertiserIds) {
+      if (runState.details >= runState.maxPerRun) {
+        report({ phase: 'detail', message: `연속 수집 한도(${runState.maxPerRun}건) 도달 — 남은 광고주는 다음 실행에서` });
+        break;
+      }
       try {
-        results.push(await collectAdvertiser(advertiserId, msg.cfg));
+        results.push(await collectAdvertiser(advertiserId, msg.cfg, runState));
       } catch (e) {
         const blocked = String(e && e.message) === 'BLOCKED';
         const msgText = blocked

@@ -98,6 +98,7 @@
 - 확장은 `GetCreativeById` 응답을 `raw` 로 함께 전송해 DB `ads.raw` 에 보존한다 — 추출이 실패했을 때 재수집·라이브 요청 없이 raw 로 구조를 진단할 수 있다(로컬 IP 가 차단된 상태에서도 원인 파악 가능).
 - 백엔드 엔드포인트(`packages/functions/src/functions/ingestHttp.ts`, CORS 허용): `POST /api/ingest`(저장), `POST /api/known`(기존 creative_id), `GET /api/advertisers`(경쟁사 목록). 저장 핸들러 `ingestCreatives` 는 collectAdDetail 의 저장 계층 재사용 — creative_id 멱등 upsert + (비디오면)YouTube 조회수/좋아요/게시일 스냅샷(서버 측, 무료). 저장 스코프는 `COLLECT_FORMATS` 따름(확장은 전체 전송, 백엔드가 필터).
 - 사용법·설치는 `tools/chrome-extension/README.md`. 요청 간격(delay)·차단 감지 자동 중단 내장.
+- **연속 수집 한도(2026-07-31 실측):** 확장으로 한 번에 502건 연속 상세 수집 시 봇 차단됨 → 한 실행의 상세 수집을 `maxPerRun`(팝업 "연속 한도", 기본 500)으로 제한. `/known` 이 수집분을 걸러 다음 실행에서 이어서 수집(중단 지점 저장 불필요).
 - **예약 자동 수집(chrome.alarms)은 구현 후 원복됨(2026-07-31):** 로컬 Chrome 프로필에 의존하는 스케줄러라 운영이 Azure 로 이전하면 무용하다는 판단. 자동화가 다시 필요하면 Azure 측(서버 크롤 Timer 또는 별도 브라우저 워커)에서 설계할 것 — 당시 구현은 PR #70/#71 참조.
 
 ## 데이터 소스 스위칭 (SerpApi ↔ 크롤)
@@ -131,6 +132,8 @@
 - **Azurite:** Azure SDK 최신 API 버전 미지원 시 `--skipApiVersionCheck` 필요 (docker-compose 반영됨).
 
 ## Azure 운영 (Phase 4 프로비저닝 완료, 2026-07-31)
+
+- **배포 파이프라인:** main 병합 시 GitHub Actions `deploy.yml` 이 테스트 → Functions(esbuild 번들: host.json+package.json+dist, node_modules 불필요) → 대시보드(Next standalone: 모노레포 경로 `packages/dashboard/server.js`, 빌드 시 더미 DATABASE_URL) 순서로 자동 배포. 인증은 publish profile 시크릿(`AZURE_FUNCTIONAPP_PUBLISH_PROFILE`·`AZURE_WEBAPP_PUBLISH_PROFILE`).
 
 - 리소스: `rg-adref-prod`(Korea Central) — PG `adref-pg-hdhtrcfw3gtpg`(B1ms·v16), KV `adref-kv-hdhtrcfw3gtpg`(시크릿: serpapi-key·youtube-api-key·pg-admin-password), Functions `adref-func-hdhtrcfw3gtpg`, Web `adref-web-hdhtrcfw3gtpg`, Storage `adrefsthdhtrcfw3gtpg`. IaC 는 `infra/bicep/main.bicep`.
 - **Azure PG 는 `azure.extensions=PGCRYPTO` 서버 파라미터를 켜야 pgcrypto 확장 생성 가능**(실측 — 없으면 마이그레이션 0000 실패).
