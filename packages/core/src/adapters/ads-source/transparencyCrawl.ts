@@ -290,31 +290,47 @@ function jitterDelay(): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// ⚠️ 프로세스 전역 직렬화 게이트 — 큐 트리거가 병렬(batchSize>1)로 돌면 실행별 지연이
+// 합산돼 요청 속도가 배수로 뛴다(실측: 확장은 순차 1200ms 로 무사, 서버는 병렬로 차단).
+// 어떤 경로로 동시 호출돼도 **모든 요청이 한 줄로 서서** 요청 간 지연을 보장한다.
+let requestGate: Promise<unknown> = Promise.resolve();
+function serialized<T>(fn: () => Promise<T>): Promise<T> {
+  const p = requestGate.then(() => jitterDelay()).then(fn);
+  requestGate = p.catch(() => undefined); // 실패해도 다음 요청 진행
+  return p;
+}
+
 const curlTransport: CrawlTransport = {
-  async rpc(rpcPath, reqBody) {
-    await jitterDelay();
-    const { stdout } = await execFileAsync(
-      'curl',
-      [
-        '-s', '--max-time', '25', `${BASE}/${rpcPath}?authuser=0`,
-        '-H', 'content-type: application/x-www-form-urlencoded;charset=UTF-8',
-        '-H', `user-agent: ${UA}`,
-        '-H', 'origin: https://adstransparency.google.com',
-        '-H', 'referer: https://adstransparency.google.com/',
-        '--data-urlencode', `f.req=${reqBody}`,
-      ],
-      { maxBuffer: 32 * 1024 * 1024 },
-    );
-    return stdout;
+  rpc(rpcPath, reqBody) {
+    return serialized(() => curlRpc(rpcPath, reqBody));
   },
-  async get(url) {
-    await jitterDelay();
-    const { stdout } = await execFileAsync('curl', ['-s', '--max-time', '25', url, '-H', `user-agent: ${UA}`], {
-      maxBuffer: 32 * 1024 * 1024,
-    });
-    return stdout;
+  get(url) {
+    return serialized(() => curlGet(url));
   },
 };
+
+async function curlRpc(rpcPath: string, reqBody: string): Promise<string> {
+  const { stdout } = await execFileAsync(
+    'curl',
+    [
+      '-s', '--max-time', '25', `${BASE}/${rpcPath}?authuser=0`,
+      '-H', 'content-type: application/x-www-form-urlencoded;charset=UTF-8',
+      '-H', `user-agent: ${UA}`,
+      '-H', 'origin: https://adstransparency.google.com',
+      '-H', 'referer: https://adstransparency.google.com/',
+      '--data-urlencode', `f.req=${reqBody}`,
+    ],
+    { maxBuffer: 32 * 1024 * 1024 },
+  );
+  return stdout;
+}
+
+async function curlGet(url: string): Promise<string> {
+  const { stdout } = await execFileAsync('curl', ['-s', '--max-time', '25', url, '-H', `user-agent: ${UA}`], {
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  return stdout;
+}
 
 /**
  * Google 광고 투명성 센터 직접 크롤링 어댑터 (SerpApi 대체, 무료).
