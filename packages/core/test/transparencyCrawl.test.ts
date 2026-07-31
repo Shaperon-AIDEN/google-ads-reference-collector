@@ -344,6 +344,23 @@ describe('TransparencyCrawlAdsSource', () => {
     expect(detail.variations![0]).toMatchObject({ width: 300, height: 250 });
   });
 
+  // 실측 회귀: gpa(텍스트+로고 합성형) 템플릿 — squareImage 필드에 배너, logo 와 별도.
+  it('getAdDetail: gpa 템플릿 — squareImage 배너·body 설명·callToAction CTA 추출', async () => {
+    const rpc = vi.fn(async () => JSON.stringify({ '1': { '5': [{ '1': { '4': 'https://p/x.js' } }] } }));
+    const get = vi.fn(
+      async () =>
+        "\\x27headline\\x27: \\x27휑한 머리 채우는 최적의 솔루션\\x27,\\x27body\\x27: \\x27기념 할인 놓치지 마세요\\x27," +
+        "\\x27callToAction\\x27: \\x27구매하기\\x27,\\x27logo\\x27: \\x27https://tpc.googlesyndication.com/simgad/LOGO1\\x27," +
+        "\\x27squareImage\\x27: \\x27https://tpc.googlesyndication.com/simgad/BANNER1\\x27",
+    );
+    const src = new TransparencyCrawlAdsSource({ rpc, get });
+    const { detail } = await src.getAdDetail({ advertiserId: 'AR1', creativeId: 'CR_GPA', format: 'image' });
+    expect(detail.imageUrl).toBe('https://tpc.googlesyndication.com/simgad/BANNER1');
+    expect(detail.logoUrl).toBe('https://tpc.googlesyndication.com/simgad/LOGO1');
+    expect(detail.description).toBe('기념 할인 놓치지 마세요');
+    expect(detail.ctaText).toBe('구매하기');
+  });
+
   it('도메인 검색은 미지원(예외)', async () => {
     const src = new TransparencyCrawlAdsSource({ rpc: vi.fn(), get: vi.fn() });
     await expect(src.searchAdvertisersByDomain({ domain: 'x.com' })).rejects.toThrow(/회사명 검색/);

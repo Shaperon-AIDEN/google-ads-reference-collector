@@ -108,6 +108,19 @@ function previewUrls(variations: Json[]): string[] {
 }
 
 /**
+ * content.js 의 명시적 이미지 필드에서 배너/상품 이미지 추출 (gpa 등 템플릿, 실측:
+ * `squareImage` 필드에 배너 simgad URL). 로고와 다른 URL 일 때만 인정한다.
+ */
+const IMAGE_FIELDS = ['squareImage', 'marketingImage', 'landscapeImage', 'square_image', 'landscape_image'];
+function extractImageField(html: string, logoUrl?: string): string | undefined {
+  for (const f of IMAGE_FIELDS) {
+    const v = fieldValue(html, f);
+    if (v && /^https?:\/\//.test(v) && (!logoUrl || v.split('?')[0] !== logoUrl.split('?')[0])) return v;
+  }
+  return undefined;
+}
+
+/**
  * content.js 의 `logo` 필드에서 브랜드 로고 추출. 실측상 base64 데이터 URI(~10KB) 또는
  * http URL 로 온다. URL 형태가 아닌 값(레이아웃 키워드 등)은 버린다.
  */
@@ -430,7 +443,7 @@ export class TransparencyCrawlAdsSource implements AdsSource {
             s.description,
           ctaText: fieldValue(html, 'callToActionText') ?? fieldValue(html, 'callToAction') ?? t.ctaText,
           logoUrl: extractLogo(html) ?? t.logoUrl,
-          imageUrl: t.imageUrl ?? pla.imageUrl,
+          imageUrl: t.imageUrl ?? pla.imageUrl ?? extractImageField(html, extractLogo(html) ?? t.logoUrl),
           landingUrl: extractLandingUrl(html) ?? t.landingUrl ?? s.landingUrl,
         };
         // 광고 단위 크기 — previewMetadata 실측값

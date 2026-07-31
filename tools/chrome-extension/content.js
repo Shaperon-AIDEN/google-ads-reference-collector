@@ -39,6 +39,16 @@ function fieldValue(html, field) {
   if (!m) m = html.match(new RegExp(`["']?${field}["']?\\s*:\\s*["']([^"']+)["']`));
   return m && m[1] ? unescapeHex(m[1]).trim() : undefined;
 }
+// content.js 의 명시적 이미지 필드(gpa 등: squareImage 에 배너 simgad URL, 실측).
+// 로고와 다른 URL 일 때만 인정.
+const IMAGE_FIELDS = ['squareImage', 'marketingImage', 'landscapeImage', 'square_image', 'landscape_image'];
+function extractImageField(html, logoUrl) {
+  for (const f of IMAGE_FIELDS) {
+    const v = fieldValue(html, f);
+    if (v && /^https?:\/\//.test(v) && (!logoUrl || v.split('?')[0] !== logoUrl.split('?')[0])) return v;
+  }
+  return undefined;
+}
 // content.js 의 logo 필드 — base64 데이터 URI(~10KB) 또는 http URL. URL 형태 아니면 버림.
 function extractLogo(html) {
   const v = fieldValue(html, 'logo');
@@ -357,7 +367,7 @@ async function getDetail(advertiserId, creativeId, format) {
         fieldValue(r.text, 'description') || fieldValue(r.text, 'body_text') || fieldValue(r.text, 'body') || t.description || s.description,
       ctaText: fieldValue(r.text, 'callToActionText') || fieldValue(r.text, 'callToAction') || t.ctaText,
       logoUrl: extractLogo(r.text) || t.logoUrl,
-      imageUrl: t.imageUrl || pla.imageUrl,
+      imageUrl: t.imageUrl || pla.imageUrl || extractImageField(r.text, extractLogo(r.text) || t.logoUrl),
       landingUrl: extractLandingUrl(r.text) || t.landingUrl || s.landingUrl,
     };
     const size = r.text.match(/"width"\s*:\s*(\d+)\s*,\s*"height"\s*:\s*(\d+)/);
