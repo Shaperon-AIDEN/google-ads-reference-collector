@@ -88,6 +88,12 @@ $('start').addEventListener('click', async () => {
   });
 });
 
+// 백로그 초기화 — 백엔드(DB)를 바꿨거나 처음부터 다시 걸러야 할 때
+$('clearBacklog').addEventListener('click', async () => {
+  await chrome.storage.local.remove('pendingWork');
+  log('백로그 초기화 완료 — 다음 수집은 목록부터 새로 시작합니다.');
+});
+
 // 진행 상황 수신
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type !== 'progress') return;
