@@ -140,6 +140,15 @@ export const adFavorites = pgTable(
   }),
 );
 
+// 6.4 crawl_pacing — 크롤 페이싱 상태 (싱글턴 행 id=1).
+// 상세 수집 window_count 가 CRAWL_RUN_LIMIT 에 닿으면 pause_until 까지 휴식,
+// 휴식 중 도착한 큐 메시지는 지연 재적재된다 (500건 끊어 수집·10분 휴식).
+export const crawlPacing = pgTable('crawl_pacing', {
+  id: integer('id').primaryKey().notNull(),
+  windowCount: integer('window_count').notNull().default(0),
+  pauseUntil: timestamp('pause_until', { withTimezone: true }),
+});
+
 // 5.4 collection_runs — 수집 실행 이력
 export const collectionRuns = pgTable('collection_runs', {
   id: uuid('id').primaryKey().defaultRandom().notNull(),

@@ -24,6 +24,11 @@ const envSchema = z.object({
   COLLECT_QUEUE_NAME: z.string().default('collect-requests'),
   BLOB_CONTAINER: z.string().default('thumbnails'),
 
+  // 크롤 페이싱 — 실행당 상세 수집 한도(기본 500)와 한도 도달 후 휴식(기본 10분).
+  // "수집 대상이 한도를 넘으면 끊어서 수집" — 502건 연속 수집 시 봇 차단 실측(2026-07-31).
+  CRAWL_RUN_LIMIT: z.coerce.number().int().min(0).default(500),
+  CRAWL_RUN_PAUSE_MS: z.coerce.number().int().min(0).default(600_000),
+
   // 쿼터 가드
   QUOTA_MONTHLY_BUDGET: z.coerce.number().int().positive().default(5000),
   QUOTA_THROTTLE_PCT: z.coerce.number().min(0).max(1).default(0.8),
