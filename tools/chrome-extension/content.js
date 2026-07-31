@@ -472,13 +472,8 @@ async function collectAdvertiser(advertiserId, cfg) {
   };
 }
 
-// popup/background → content 명령 수신
+// popup → content 명령 수신
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === 'ping') {
-    // 자동 수집이 탭 준비 여부를 확인할 때 사용
-    sendResponse({ ok: true });
-    return false;
-  }
   if (msg?.type !== 'collect') return false;
   (async () => {
     const results = [];
