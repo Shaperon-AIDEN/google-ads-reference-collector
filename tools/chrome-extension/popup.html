@@ -38,6 +38,16 @@
     <div id="advertisers"><span class="muted">"경쟁사 불러오기"로 목록을 가져오세요.</span></div>
 
     <button id="start">수집 시작</button>
+
+    <div style="border-top:1px solid #eee; margin-top:12px; padding-top:10px">
+      <label style="display:flex; align-items:center; gap:6px; margin:0">
+        <input id="autoEnabled" type="checkbox" style="width:auto" /> 매일 자동 수집
+        <input id="autoTime" type="time" value="12:30" style="width:auto; margin-left:6px" />
+      </label>
+      <div class="muted" id="autoInfo" style="margin-top:4px">이 Chrome(프로필)이 켜져 있어야 예약이 실행됩니다.</div>
+      <button class="sec" id="autoRunNow" style="margin-top:6px">지금 자동수집 테스트</button>
+    </div>
+
     <div id="log"></div>
 
     <script src="popup.js"></script>

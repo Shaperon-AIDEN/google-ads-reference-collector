@@ -52,3 +52,19 @@ pnpm dev:functions   # 기본 http://localhost:7071
 - 비공식 내부 RPC 기반 — Google이 형식을 바꾸면 조용히 깨질 수 있다(파싱 로직은 `packages/core`의 크롤 어댑터와 동일).
 - **비디오 광고만** 저장(프로젝트 스코프). 이미지/텍스트는 건너뜀.
 - 실제 브라우저라도 과도하게 빠르면 차단될 수 있으니 간격을 넉넉히.
+
+## 예약 자동 수집 (로그아웃 전용 프로필)
+
+수동 수집과 별개로, 매일 지정 시각에 전체 경쟁사를 자동 수집할 수 있다.
+
+1. **전용 로그아웃 프로필 준비(1회):**
+   ```bash
+   open -na "Google Chrome" --args --user-data-dir="$HOME/.adref-chrome-profile" --no-first-run
+   ```
+   이 창에서 `chrome://extensions` → 개발자 모드 → "압축해제된 확장 프로그램 로드" → `tools/chrome-extension`.
+   Google 로그인은 하지 않는다.
+2. **예약 설정:** 확장 팝업 → "매일 자동 수집" 체크 + 시각 지정(기본 12:30). "지금 자동수집 테스트"로 즉시 검증.
+3. **(선택) Chrome 자동 기동:** 알람은 이 프로필의 Chrome 이 켜져 있어야 발화한다. `launchd/com.adref.autocollect.plist` 를 설치하면 매일 12:20 에 프로필이 자동으로 열린다 (plist 안 설치 방법 참조).
+
+- 수집 루프는 탭(content script) 안에서 돌므로 진행 중 서비스워커가 잠들어도 계속된다.
+- 백엔드(`pnpm dev:functions`)가 떠 있어야 저장된다. 결과·이력은 팝업 하단 로그(최근 50건 보존)에서 확인.
