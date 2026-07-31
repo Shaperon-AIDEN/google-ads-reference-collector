@@ -82,6 +82,42 @@ $('start').addEventListener('click', async () => {
   });
 });
 
+// ===== 예약 자동 수집 =====
+function refreshAutoStatus() {
+  chrome.runtime.sendMessage({ type: 'autoStatus' }, (res) => {
+    if (chrome.runtime.lastError || !res || !res.ok) return;
+    if (res.cfg) {
+      $('autoEnabled').checked = !!res.cfg.enabled;
+      if (res.cfg.time) $('autoTime').value = res.cfg.time;
+    }
+    $('autoInfo').textContent = res.nextRun
+      ? `다음 실행: ${res.nextRun} (이 Chrome 프로필이 켜져 있어야 함)`
+      : '예약 없음 — 이 Chrome(프로필)이 켜져 있어야 예약이 실행됩니다.';
+    if (res.log && res.log.length) log(res.log.slice(-5).join('\n'));
+  });
+}
+refreshAutoStatus();
+
+function saveAutoSchedule() {
+  chrome.runtime.sendMessage(
+    { type: 'autoSchedule', enabled: $('autoEnabled').checked, time: $('autoTime').value },
+    (res) => {
+      if (chrome.runtime.lastError) return log('예약 실패: ' + chrome.runtime.lastError.message);
+      $('autoInfo').textContent = res && res.nextRun ? `다음 실행: ${res.nextRun}` : '예약 없음';
+    },
+  );
+}
+$('autoEnabled').addEventListener('change', saveAutoSchedule);
+$('autoTime').addEventListener('change', () => { if ($('autoEnabled').checked) saveAutoSchedule(); });
+
+$('autoRunNow').addEventListener('click', () => {
+  readCfg(); // 현재 팝업 설정 저장 → 자동 수집이 같은 설정 사용
+  chrome.runtime.sendMessage({ type: 'autoRunNow' }, (res) => {
+    if (chrome.runtime.lastError) return log('오류: ' + chrome.runtime.lastError.message);
+    if (res && res.started) log('자동 수집 시작 (백그라운드) — 진행은 아래 로그와 "매일 자동 수집" 상태에 기록됩니다.');
+  });
+});
+
 // 진행 상황 수신
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type !== 'progress') return;
