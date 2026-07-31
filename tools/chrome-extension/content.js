@@ -400,116 +400,153 @@ async function getDetail(advertiserId, creativeId, format) {
   };
 }
 
-// runState: 이번 실행 전체(모든 광고주 합산)의 상세 수집 카운터.
-// ⚠️ 실측(2026-07-31): 한 번에 502건 연속 상세 수집 → 봇 차단. 한 실행의 상세 요청을
-// maxPerRun(기본 500)으로 제한한다 — /known 이 수집분을 걸러주므로 다음 실행에서 이어서 수집된다.
-async function collectAdvertiser(advertiserId, cfg, runState) {
+// ===== 수집 백로그 (chrome.storage) =====
+// 목록·신규판정 결과를 저장해 두고, 한도/차단으로 멈췄다 재개할 때 **목록 재수집 없이** 이어서
+// 상세만 수집한다. 백로그가 비면 삭제 → 다음 수집은 새로 목록부터.
+async function loadBacklog() {
+  const { pendingWork } = await chrome.storage.local.get('pendingWork');
+  return pendingWork && Array.isArray(pendingWork.items) && pendingWork.items.length ? pendingWork : null;
+}
+async function saveBacklog(items, meta) {
+  if (!items.length) return chrome.storage.local.remove('pendingWork');
+  await chrome.storage.local.set({ pendingWork: { items, meta, savedAt: Date.now() } });
+}
+
+// 광고주들의 목록을 순회해 신규 작업 목록을 만든다 (상세 수집 전 단계)
+async function buildBacklog(advertiserIds, cfg) {
   const base = cfg.ingestBase.replace(/\/$/, '');
-  report({ phase: 'list', advertiserId, message: '목록 조회 중…' });
-
-  // 1) 전체 페이지네이션 → 모든 크리에이티브 목록 (백엔드가 COLLECT_FORMATS 로 스코프 필터)
-  const all = [];
-  let token, pages = 0;
-  while (pages < 300) {
-    const { items, next } = await listPage(advertiserId, cfg.region, cfg.num, token);
-    for (const it of items) all.push(it);
-    pages += 1;
-    report({ phase: 'list', advertiserId, message: `목록 ${pages}페이지, ${all.length}건` });
-    if (!next) break;
-    token = next;
-    await sleep(jitter(cfg.delayMs));
-  }
-
-  // 2) 이미 저장된 것 제외 (신규만 상세 요청 → 요청 수·차단 위험 최소화)
-  const knownRes = await bg({ type: 'post', url: `${base}/known`, body: { creativeIds: all.map((v) => v.creativeId) } });
-  const known = new Set((knownRes && knownRes.ok && knownRes.data && knownRes.data.known) || []);
-  const fresh = all.filter((v) => !known.has(v.creativeId));
-  report({ phase: 'detail', advertiserId, message: `${all.length}건 중 신규 ${fresh.length}건 상세 수집 시작` });
-
-  // 3) 신규만 상세 수집 → flushEvery 건마다 즉시 저장(점진 반영·중단 시 진행분 보존)
-  const flushEvery = Math.max(1, cfg.flushEvery || 5);
-  let buffer = [];
-  let collected = 0;
-  let savedTotal = 0;
-  let lastError = null;
-
-  // 버퍼를 백엔드로 저장하고 성공 건수를 누적. 실패해도 수집은 계속(다음 flush 에서 재시도되진 않음).
-  async function flush() {
-    if (buffer.length === 0) return;
-    const batch = buffer;
-    buffer = [];
-    const res = await bg({ type: 'post', url: `${base}/ingest`, body: { advertiserId, ads: batch } });
-    if (res && res.ok && res.data) savedTotal += res.data.saved || 0;
-    else lastError = (res && res.error) || (res && res.data && res.data.error) || 'ingest 실패';
-    report({ phase: 'detail', advertiserId, message: `저장 누적 ${savedTotal}건` });
-  }
-
-  let blocked = false;
-  let limited = false;
-  for (let i = 0; i < fresh.length; i++) {
-    if (runState.details >= runState.maxPerRun) {
-      limited = true;
-      report({ phase: 'detail', advertiserId, message: `연속 수집 한도(${runState.maxPerRun}건) 도달 — 진행분 저장 후 중단 (다음 실행에서 이어서)` });
-      break;
+  const items = [];
+  const totals = {};
+  for (const advertiserId of advertiserIds) {
+    report({ phase: 'list', advertiserId, message: '목록 조회 중…' });
+    const all = [];
+    let token, pages = 0;
+    while (pages < 300) {
+      const { items: page, next } = await listPage(advertiserId, cfg.region, cfg.num, token);
+      for (const it of page) all.push(it);
+      pages += 1;
+      report({ phase: 'list', advertiserId, message: `목록 ${pages}페이지, ${all.length}건` });
+      if (!next) break;
+      token = next;
+      await sleep(jitter(cfg.delayMs));
     }
-    const v = fresh[i];
+    totals[advertiserId] = all.length;
+    // 이미 저장된 것 제외 (신규만 상세 요청 → 요청 수·차단 위험 최소화)
+    const knownRes = await bg({ type: 'post', url: `${base}/known`, body: { creativeIds: all.map((v) => v.creativeId) } });
+    const known = new Set((knownRes && knownRes.ok && knownRes.data && knownRes.data.known) || []);
+    for (const v of all) if (!known.has(v.creativeId)) items.push({ advertiserId, ...v });
+    report({ phase: 'detail', advertiserId, message: `${all.length}건 중 신규 ${items.filter((i) => i.advertiserId === advertiserId).length}건` });
+  }
+  return { items, meta: { totals } };
+}
+
+// 백로그의 상세를 수집한다. 연속 한도(maxPerRun)에 닿으면 restIntervalMs 만큼 쉬었다가
+// **자동 재개**해 완주한다. 차단 시엔 백로그를 보존하고 중단(다음 실행이 이어서).
+async function processBacklog(backlog, cfg) {
+  const base = cfg.ingestBase.replace(/\/$/, '');
+  const flushEvery = Math.max(1, cfg.flushEvery || 5);
+  const maxPerRun = Number(cfg.maxPerRun) > 0 ? Number(cfg.maxPerRun) : 500;
+  const restMs = Math.max(0, Number(cfg.restIntervalMs) || 0);
+  const items = backlog.items;
+  const totalWork = items.length;
+
+  const buffers = new Map(); // advertiserId → ads[]
+  const savedByAdv = {};
+  let lastError = null;
+  let windowCount = 0;
+  let doneCount = 0;
+  let blocked = false;
+
+  async function flushAll() {
+    for (const [advertiserId, ads] of buffers) {
+      if (!ads.length) continue;
+      buffers.set(advertiserId, []);
+      const res = await bg({ type: 'post', url: `${base}/ingest`, body: { advertiserId, ads } });
+      if (res && res.ok && res.data) savedByAdv[advertiserId] = (savedByAdv[advertiserId] || 0) + (res.data.saved || 0);
+      else lastError = (res && res.error) || (res && res.data && res.data.error) || 'ingest 실패';
+    }
+  }
+
+  while (items.length > 0) {
+    // 연속 한도 도달 → 저장·백로그 보존 후 인터벌만큼 쉬고 자동 재개
+    if (windowCount >= maxPerRun) {
+      await flushAll();
+      await saveBacklog(items, backlog.meta);
+      if (restMs <= 0) {
+        report({ phase: 'detail', message: `연속 한도(${maxPerRun}건) 도달 — 중단 (다음 "수집 시작"이 이어서, 남은 ${items.length}건)` });
+        return { blocked: false, remaining: items.length, savedByAdv, lastError };
+      }
+      const until = new Date(Date.now() + restMs).toLocaleTimeString('ko-KR');
+      report({ phase: 'rest', message: `연속 한도(${maxPerRun}건) 도달 — ${Math.round(restMs / 60000)}분 휴식 후 자동 재개 (${until}, 남은 ${items.length}건)` });
+      await sleep(restMs);
+      windowCount = 0;
+      report({ phase: 'detail', message: '휴식 종료 — 수집 재개' });
+    }
+
+    const v = items[0];
     try {
-      const d = await getDetail(advertiserId, v.creativeId, v.format);
-      buffer.push({ ...v, ...d });
-      collected += 1;
-      runState.details += 1;
+      const d = await getDetail(v.advertiserId, v.creativeId, v.format);
+      if (!buffers.has(v.advertiserId)) buffers.set(v.advertiserId, []);
+      const { advertiserId: _a, ...rest } = v;
+      buffers.get(v.advertiserId).push({ ...rest, ...d });
+      windowCount += 1;
     } catch (e) {
       if (String(e && e.message) === 'BLOCKED') {
         blocked = true;
-        report({ phase: 'blocked', advertiserId, message: `⚠️ 차단 감지 — 지금까지 수집분 저장 후 중단` });
+        report({ phase: 'blocked', message: '⚠️ 차단 감지 — 진행분 저장·백로그 보존 후 중단 (다음 실행이 이어서)' });
         break;
       }
-      // 개별 실패는 건너뜀
+      // 개별 실패는 건너뜀 (백로그에서 제거)
     }
-    if (buffer.length >= flushEvery) await flush(); // flushEvery 건마다 즉시 저장
-    report({ phase: 'detail', advertiserId, message: `상세 ${i + 1}/${fresh.length}` });
+    items.shift();
+    doneCount += 1;
+    const pending = [...buffers.values()].reduce((n, a) => n + a.length, 0);
+    if (pending >= flushEvery) await flushAll();
+    if (doneCount % 10 === 0 || items.length === 0) {
+      report({ phase: 'detail', message: `상세 ${doneCount}/${totalWork} (저장 누적 ${Object.values(savedByAdv).reduce((a, b) => a + b, 0)}건)` });
+      await saveBacklog(items, backlog.meta); // 주기 저장 — 탭이 닫혀도 진행 보존
+    }
     await sleep(jitter(cfg.delayMs));
   }
-  await flush(); // 잔여분(차단·종료 포함) 저장
 
-  return {
-    advertiserId,
-    total: all.length,
-    fresh: fresh.length,
-    collected,
-    blocked,
-    limited,
-    saved: lastError ? { saved: savedTotal, error: lastError } : { saved: savedTotal },
-  };
+  await flushAll();
+  await saveBacklog(items, backlog.meta); // 빈 배열이면 백로그 삭제
+  return { blocked, remaining: items.length, savedByAdv, lastError };
 }
 
-// popup → content 명령 수신
+// popup/background → content 명령 수신
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type !== 'collect') return false;
   (async () => {
-    const results = [];
-    // 이번 실행 전체의 상세 수집 한도 (모든 광고주 합산, 기본 500)
-    const runState = { details: 0, maxPerRun: Number(msg.cfg.maxPerRun) > 0 ? Number(msg.cfg.maxPerRun) : 500 };
-    for (const advertiserId of msg.advertiserIds) {
-      if (runState.details >= runState.maxPerRun) {
-        report({ phase: 'detail', message: `연속 수집 한도(${runState.maxPerRun}건) 도달 — 남은 광고주는 다음 실행에서` });
-        break;
-      }
+    const cfg = msg.cfg;
+    // 미완료 백로그가 있으면 목록 재수집 없이 이어서, 없으면 목록부터
+    let backlog = await loadBacklog();
+    if (backlog) {
+      report({ phase: 'detail', message: `이전 미완료 작업 ${backlog.items.length}건 발견 — 목록 재수집 없이 이어서 수집` });
+    } else {
       try {
-        results.push(await collectAdvertiser(advertiserId, msg.cfg, runState));
+        backlog = await buildBacklog(msg.advertiserIds, cfg);
+        await saveBacklog(backlog.items, backlog.meta);
       } catch (e) {
-        const blocked = String(e && e.message) === 'BLOCKED';
-        const msgText = blocked
-          ? '⚠️ Google 봇 차단(/sorry) — IP 가 일시 차단됨. 잠시 후(수십 분) 재시도하거나 요청 간격을 늘리세요. 전체 중단.'
-          : String(e && e.message);
-        report({ phase: blocked ? 'blocked' : 'error', advertiserId, message: msgText });
-        results.push({ advertiserId, error: msgText });
-        if (blocked) break; // 차단 시 전체 중단
+        const isBlocked = String(e && e.message) === 'BLOCKED';
+        report({ phase: isBlocked ? 'blocked' : 'error', message: isBlocked ? '⚠️ 차단 감지 — 목록 단계 중단' : String(e && e.message) });
+        sendResponse({ ok: false, error: String(e && e.message) });
+        return;
       }
-      await sleep(jitter(msg.cfg.delayMs));
     }
-    report({ phase: 'done', message: '완료', results });
-    sendResponse({ ok: true, results });
+
+    const r = await processBacklog(backlog, cfg);
+    const summary = Object.entries(r.savedByAdv).map(([a, n]) => `${a}: 저장 ${n}건`);
+    report({
+      phase: 'done',
+      message: r.blocked
+        ? `차단으로 중단 — 남은 ${r.remaining}건은 백로그 보존됨 (다음 실행이 이어서)`
+        : r.remaining > 0
+          ? `한도 중단 — 남은 ${r.remaining}건 백로그 보존`
+          : '완료',
+      results: summary.map((s) => ({ advertiserId: s, saved: {} })),
+    });
+    sendResponse({ ok: true, summary, remaining: r.remaining, blocked: r.blocked, error: r.lastError });
   })();
   return true; // async
 });
