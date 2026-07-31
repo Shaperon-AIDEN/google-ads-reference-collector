@@ -112,7 +112,7 @@
     - **raw 백필:** 추출기가 개선되면 재수집 없이 `scripts/backfill-from-raw.mts` 로 기존 광고를 보강한다 — 저장된 raw 의 미리보기 URL(googleusercontent CDN, 봇 차단 대상 아님)만 다시 받아 재추출하므로 RPC(/sorry 차단)와 무관.
     - **⚠️ content.js 필드명 따옴표 유무가 섞여 있다**(실측): adData 최상위는 `destination_url: \x27값\x27`(**무따옴표**), `google_template_data` 내부는 `\x27headline\x27: \x27값\x27`(따옴표). `fieldValue` 정규식이 **양쪽을 모두** 잡아야 한다 — 예전엔 무따옴표를 놓쳐 랜딩 URL 확보율이 낮았다("best-effort"의 원인).
     - **content.js 는 정적 텍스트다** — fetch 응답이 즉시 완전하므로 "렌더링 대기"는 기술적으로 불필요(브라우저의 시각적 iframe 렌더 완료와 무관). 필요한 값(YouTube ID·이미지·랜딩·문구)은 모두 텍스트에서 정규식으로 추출된다. discover 레이아웃 비디오 광고는 `thumbnail`/`video_videoId` 에 YouTube ID 가 들어있다.
-    - **상세 대기는 기본 0(2026-07-30 확정):** 이미지·텍스트 상세의 6000ms 대기를 실측 검증한 결과 수집 품질과 무관했다(백필 0ms = 6000ms 결과 동일 — 모든 미수집 사례의 원인은 템플릿 파서 커버리지였음). 옵션은 유지하되 기본값 0 — 서버 `CRAWL_DETAIL_WAIT_MS`, 확장 팝업 "상세 대기(ms)".
+    - **"상세 대기" 기능은 도입 후 제거됨(2026-07-31):** 이미지·텍스트 상세의 6000ms 대기를 실측 검증한 결과 수집 품질과 무관했다(content.js 는 정적 — 백필 0ms = 6000ms 결과 동일, 모든 미수집 사례의 원인은 템플릿 파서 커버리지). 옵션·입력란까지 전부 제거 — 재도입 논의 시 이 실측을 참조.
     - 조회수: 크롤과 무관 — YouTube Data API(무료)로 수집(youtube_video_id 있으면). 투명성 센터는 상업광고 조회수 미제공.
     - **제한**: 랜딩 URL 불안정(best-effort), 도메인 검색 미지원(회사명 검색 사용). `apiCalls=0`(쿼터 미소모).
     - **리스크**: 비공식·형식 변동 시 조용히 빈 결과, 대량 시 봇 차단 가능, ToS. 깨지면 `ADS_SOURCE=serpapi` 로 롤백.
