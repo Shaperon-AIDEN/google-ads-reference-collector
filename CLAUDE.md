@@ -2,6 +2,19 @@
 
 구글 광고 레퍼런스 수집 시스템 저장소에서 작업할 때 따르는 규칙.
 
+## 📌 현재 상태 · 인수인계 (2026-08-18 기준)
+
+**다른 세션에서 이어서 작업할 때 여기부터 읽는다.**
+
+- **단계:** Phase 5 (Azure 운영·안정화) 진행 중 — Phase 0~4 완료. 로컬은 개발용, **운영은 Azure**.
+- **운영 URL:** 대시보드 https://adref-web-hdhtrcfw3gtpg.azurewebsites.net · 수집기 API https://adref-func-hdhtrcfw3gtpg.azurewebsites.net/api
+- **수집 체계(확정 정책):** ① **대량 초기 수집 = Chrome 확장**(팝업 백엔드 주소를 Azure API 로 — 봇 차단 없는 유일한 경로) ② **일상 증분 = Azure 타이머 크롤**(KST 09/21시, 일 50~120건 수준은 차단 안 됨) ③ **조회수·좋아요 = Azure 타이머**(KST 12시, YouTube API·차단 무관). ⚠️ Azure IP 로 수천 건 대량 크롤은 차단됨(실측 2026-07-31) — 하지 말 것.
+- **데이터(8-18):** 광고 ~5,600건+·일별 스냅샷 매일 ~3,600건 적재 중. 아이리스브라이트 잔여(~2천건)는 확장 대량 수집으로 채우는 중.
+- **git 리모트:** `origin`=개인(SungminKo-smko, **CI 배포 기준**) · `shaperon`=조직(Shaperon-AIDEN) 미러 — main 병합 후 `git push shaperon main` 으로 동기화.
+- **Azure 접속:** az CLI 로그인(구독 "Azure subscription 1"). PG 비밀번호는 KV `adref-kv-hdhtrcfw3gtpg` 시크릿 `pg-admin-password`. **PG 는 방화벽 IP 등록 필요**(IP 바뀌면 `az postgres flexible-server firewall-rule create` — Connection refused 가 그 신호).
+- **남은 과제:** 비용 경보(Portal 수동 — 예산 API 401), Phase 5 잔여(App Insights 커스텀 메트릭·모니터 경보·Easy Auth 검토), 조직 repo 로 CI 이전 여부 결정.
+- **자주 쓰는 점검 쿼리:** `collection_runs`(일별 실행), `ad_metrics` snapshot_date 별 건수, `crawl_pacing`(페이싱 상태), 큐 잔량은 대시보드 `/api/collect-progress`.
+
 ## 🔴 문서 동기화 규칙 (필수)
 
 **각 단계별로 개발이 진행되거나 변경사항이 발생하면, `PROJECT.md`, `TODO.md`, `CLAUDE.md`를 항상 업데이트한다.**
@@ -139,4 +152,8 @@
 
 - 리소스: `rg-adref-prod`(Korea Central) — PG `adref-pg-hdhtrcfw3gtpg`(B1ms·v16), KV `adref-kv-hdhtrcfw3gtpg`(시크릿: serpapi-key·youtube-api-key·pg-admin-password), Functions `adref-func-hdhtrcfw3gtpg`, Web `adref-web-hdhtrcfw3gtpg`, Storage `adrefsthdhtrcfw3gtpg`. IaC 는 `infra/bicep/main.bicep`.
 - **Azure PG 는 `azure.extensions=PGCRYPTO` 서버 파라미터를 켜야 pgcrypto 확장 생성 가능**(실측 — 없으면 마이그레이션 0000 실패).
-- Azure Functions 의 `ADS_SOURCE` 기본은 `serpapi` — 데이터센터 IP 는 투명성 센터 크롤이 차단되기 쉬움. 확장 수집은 팝업 백엔드 주소를 Functions URL 로 바꿔 병행.
+- 현재 운영값: `ADS_SOURCE=crawl`(증분 전용) · `COLLECT_FORMATS=all` · `CRAWL_THROTTLE_MS=1500` · `CRAWL_RUN_LIMIT=500`/`CRAWL_RUN_PAUSE_MS=600000`. 데이터센터 IP 대량 크롤 차단 실측 → 대량은 확장.
+- **배포 후 트리거 동기화가 누락될 수 있다**(실측: 함수 0개 등록/큐 미소비): `az rest --method post --url .../sites/adref-func-*/syncfunctiontriggers?api-version=2023-12-01` 로 수동 동기화. 대시보드는 배포 후 `az webapp restart` 가 안전.
+- **긴급 정지:** 크롤 차단 등으로 큐 처리를 멈출 땐 앱 설정 `AzureWebJobs.<함수명>.Disabled=true`(adDetailCollector·collectRequestProcessor). ⚠️ 재개(설정 삭제)를 잊으면 "감지는 되는데 저장 안 됨" 상태가 된다(실측: 12일 방치 사고) — 끄면 TODO 에 기록할 것.
+- 유틸 스크립트: `scripts/backfill-from-raw.mts`(raw 재추출 백필·RPC 미사용), `scripts/migrate-data-to-azure.mts`(로컬→Azure 이관), `scripts/recollect-components.mts`(RPC 재수집), `scripts/test-pagination.mts`(광고주 총량 실측). 모두 `DATABASE_URL`(또는 LOCAL_DB/AZURE_DB) 주입해 `pnpm tsx` 로 실행.
+- **로컬 수집기 재시작은 `pnpm start`**(prestart=esbuild) — `func start` 직접 실행은 stale 번들을 서빙한다(실측).
