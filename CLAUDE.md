@@ -10,9 +10,9 @@
 - **운영 URL:** 대시보드 https://adref-web-hdhtrcfw3gtpg.azurewebsites.net · 수집기 API https://adref-func-hdhtrcfw3gtpg.azurewebsites.net/api
 - **수집 체계(확정 정책):** ① **대량 초기 수집 = Chrome 확장**(팝업 백엔드 주소를 Azure API 로 — 봇 차단 없는 유일한 경로) ② **일상 증분 = Azure 타이머 크롤**(KST 09/21시, 일 50~120건 수준은 차단 안 됨) ③ **조회수·좋아요 = Azure 타이머**(KST 12시, YouTube API·차단 무관). ⚠️ Azure IP 로 수천 건 대량 크롤은 차단됨(실측 2026-07-31) — 하지 말 것.
 - **데이터(8-18):** 광고 ~5,600건+·일별 스냅샷 매일 ~3,600건 적재 중. 아이리스브라이트 잔여(~2천건)는 확장 대량 수집으로 채우는 중.
-- **git 리모트:** `origin`=개인(SungminKo-smko, **CI 배포 기준**) · `shaperon`=조직(Shaperon-AIDEN) 미러 — main 병합 후 `git push shaperon main` 으로 동기화.
+- **git 리모트:** `origin`=**조직(Shaperon-AIDEN, CI 배포 기준·주 저장소)** · `personal`=개인(SungminKo-smko) 미러(deploy 워크플로 비활성) — main 병합 후 `git push personal main` 으로 동기화(선택).
 - **Azure 접속:** az CLI 로그인(구독 "Azure subscription 1"). PG 비밀번호는 KV `adref-kv-hdhtrcfw3gtpg` 시크릿 `pg-admin-password`. **PG 는 방화벽 IP 등록 필요**(IP 바뀌면 `az postgres flexible-server firewall-rule create` — Connection refused 가 그 신호).
-- **남은 과제:** 비용 경보(Portal 수동 — 예산 API 401), Phase 5 잔여(App Insights 커스텀 메트릭·모니터 경보·Easy Auth 검토), 조직 repo 로 CI 이전 여부 결정.
+- **남은 과제:** 비용 경보(Portal 수동 — 예산 API 401), Phase 5 잔여(App Insights 커스텀 메트릭·모니터 경보·Easy Auth 검토).
 - **자주 쓰는 점검 쿼리:** `collection_runs`(일별 실행), `ad_metrics` snapshot_date 별 건수, `crawl_pacing`(페이싱 상태), 큐 잔량은 대시보드 `/api/collect-progress`.
 
 ## 🔴 문서 동기화 규칙 (필수)
