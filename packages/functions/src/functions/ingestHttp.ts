@@ -1,5 +1,5 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
-import { buildDeps } from '../handlers/context.js';
+import { getDeps } from '../handlers/context.js';
 import { ingestCreatives, type IngestPayload } from '../handlers/ingestCreatives.js';
 
 // Chrome 확장(chrome-extension://…)에서 POST 하므로 CORS 허용.
@@ -27,7 +27,7 @@ export async function ingestHttp(req: HttpRequest, context: InvocationContext): 
     return { status: 400, headers: CORS, jsonBody: { error: 'advertiserId 와 ads[] 가 필요합니다' } };
   }
 
-  const deps = await buildDeps();
+  const deps = await getDeps(); // 프로세스 공유 — 연결 재사용(크레딧 보호)
   try {
     const result = await ingestCreatives(deps, body);
     context.log(
@@ -38,8 +38,6 @@ export async function ingestHttp(req: HttpRequest, context: InvocationContext): 
     const message = err instanceof Error ? err.message : String(err);
     context.error(`[ingest] 실패: ${message}`);
     return { status: 500, headers: CORS, jsonBody: { error: message } };
-  } finally {
-    await deps.close();
   }
 }
 
@@ -65,14 +63,10 @@ export async function knownHttp(req: HttpRequest, context: InvocationContext): P
   }
   const ids = Array.isArray(body?.creativeIds) ? body.creativeIds : [];
 
-  const deps = await buildDeps();
-  try {
-    const known = await deps.repos.ads.existingCreativeIds(ids);
-    context.log(`[known] 조회 ${ids.length}건 중 기존 ${known.size}건`);
-    return { status: 200, headers: CORS, jsonBody: { known: [...known] } };
-  } finally {
-    await deps.close();
-  }
+  const deps = await getDeps(); // 프로세스 공유 — 연결 재사용(크레딧 보호)
+  const known = await deps.repos.ads.existingCreativeIds(ids);
+  context.log(`[known] 조회 ${ids.length}건 중 기존 ${known.size}건`);
+  return { status: 200, headers: CORS, jsonBody: { known: [...known] } };
 }
 
 app.http('known', {
@@ -88,14 +82,10 @@ app.http('known', {
  */
 export async function advertisersHttp(req: HttpRequest, _context: InvocationContext): Promise<HttpResponseInit> {
   if (req.method === 'OPTIONS') return { status: 204, headers: CORS };
-  const deps = await buildDeps();
-  try {
-    const rows = await deps.repos.competitors.listAll();
-    const list = rows.map((c) => ({ advertiserId: c.advertiserId, name: c.name, region: c.region }));
-    return { status: 200, headers: CORS, jsonBody: { advertisers: list } };
-  } finally {
-    await deps.close();
-  }
+  const deps = await getDeps(); // 프로세스 공유 — 연결 재사용(크레딧 보호)
+  const rows = await deps.repos.competitors.listAll();
+  const list = rows.map((c) => ({ advertiserId: c.advertiserId, name: c.name, region: c.region }));
+  return { status: 200, headers: CORS, jsonBody: { advertisers: list } };
 }
 
 app.http('advertisers', {

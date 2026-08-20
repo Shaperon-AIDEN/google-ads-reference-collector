@@ -1,6 +1,6 @@
 import { app, type InvocationContext } from '@azure/functions';
 import type { NewAdQueueMessage } from '@adref/core';
-import { buildDeps } from '../handlers/context.js';
+import { getDeps } from '../handlers/context.js';
 import { collectAdDetail } from '../handlers/collectAdDetail.js';
 
 /**
@@ -12,13 +12,9 @@ export async function adDetailCollector(
   context: InvocationContext,
 ): Promise<void> {
   const msg = message as NewAdQueueMessage;
-  const deps = await buildDeps();
-  try {
-    await collectAdDetail(deps, msg);
-    context.log(`[adDetailCollector] saved creativeId=${msg.creativeId}`);
-  } finally {
-    await deps.close();
-  }
+  const deps = await getDeps(); // 프로세스 공유 — 연결 재사용(크레딧 보호)
+  await collectAdDetail(deps, msg);
+  context.log(`[adDetailCollector] saved creativeId=${msg.creativeId}`);
 }
 
 app.storageQueue('adDetailCollector', {
