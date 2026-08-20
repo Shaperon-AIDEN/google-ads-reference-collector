@@ -1,6 +1,6 @@
 import { app, type InvocationContext } from '@azure/functions';
 import type { CollectRequestMessage } from '@adref/core';
-import { buildDeps } from '../handlers/context.js';
+import { getDeps } from '../handlers/context.js';
 import { collectForCompetitor } from '../handlers/collectForCompetitor.js';
 
 /**
@@ -13,13 +13,9 @@ export async function collectRequestProcessor(
   context: InvocationContext,
 ): Promise<void> {
   const msg = message as CollectRequestMessage;
-  const deps = await buildDeps();
-  try {
-    const result = await collectForCompetitor(deps, msg.competitorId, { maxTotal: msg.maxTotal, pageToken: msg.pageToken });
-    context.log(`[collectRequestProcessor] ${result.competitor} new=${result.newAds} inline=${result.processedInline}`);
-  } finally {
-    await deps.close();
-  }
+  const deps = await getDeps(); // 프로세스 공유 — 연결 재사용(크레딧 보호)
+  const result = await collectForCompetitor(deps, msg.competitorId, { maxTotal: msg.maxTotal, pageToken: msg.pageToken });
+  context.log(`[collectRequestProcessor] ${result.competitor} new=${result.newAds} inline=${result.processedInline}`);
 }
 
 app.storageQueue('collectRequestProcessor', {

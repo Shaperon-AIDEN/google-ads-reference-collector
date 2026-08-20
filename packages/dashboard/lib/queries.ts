@@ -68,19 +68,32 @@ const latestLikesSql = sql<number>`(
   ORDER BY m.snapshot_date DESC LIMIT 1
 )`;
 
+// 광고별 최신 지표를 **한 번의 스캔**으로 뽑는 조인 서브쿼리 (lm).
+// ⚠️ 이전의 행별 상관 서브쿼리(광고 1건당 3회)는 ad_metrics 가 커질수록 기하급수로 느려져
+//    B1ms CPU 크레딧 고갈을 유발했다(실측: 12ms → 5초+, 2026-08). DISTINCT ON 1스캔으로 대체.
+const latestMetricsJoin = sql`(
+  SELECT DISTINCT ON (m.ad_id) m.ad_id,
+         m.yt_view_count AS views,
+         m.yt_like_count AS likes
+  FROM ad_metrics m
+  ORDER BY m.ad_id, m.snapshot_date DESC
+) lm`;
+const lmViews = sql<number>`lm.views`;
+const lmLikes = sql<number>`lm.likes`;
+
 /** 레퍼런스 리스트 (메인) — 경쟁사명 조인 + 최신 조회수, 정렬·필터 */
 export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
   // 조회수가 확인되지 않는 영상(비-YouTube·비공개·삭제·미스냅샷)은 목록에서 숨긴다(데이터는 보존).
   // SHOW_ALL_FORMATS('all')이면 이미지/텍스트는 조회수가 원래 없으므로 항상 표시하고, 비디오만 조회수 조건 적용.
   const conds = [
     showAllFormats()
-      ? sql`(${ads.format} <> 'video' OR ${latestViewsSql} IS NOT NULL)`
-      : sql`${latestViewsSql} IS NOT NULL`,
+      ? sql`(${ads.format} <> 'video' OR ${lmViews} IS NOT NULL)`
+      : sql`${lmViews} IS NOT NULL`,
   ];
   if (filter.competitorId) conds.push(eq(ads.competitorId, filter.competitorId));
   if (filter.format) conds.push(eq(ads.format, filter.format));
   if (filter.minViews && filter.minViews > 0) {
-    conds.push(sql`${latestViewsSql} >= ${filter.minViews}`);
+    conds.push(sql`${lmViews} >= ${filter.minViews}`);
   }
   // 조회수·좋아요 기반 필터/정렬 시 → 해당 데이터가 없는 텍스트/이미지 광고는 제외(비디오만).
   // 단 사용자가 형식을 명시적으로 고른 경우(filter.format)엔 그 선택을 존중한다.
@@ -95,9 +108,9 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
   //    맨 아래로 보낸다 (좋아요 비공개 영상·스냅샷 미확보 등).
   const order =
     filter.sort === 'views'
-      ? sql`${latestViewsSql} desc nulls last`
+      ? sql`${lmViews} desc nulls last`
       : filter.sort === 'likes'
-        ? sql`${latestLikesSql} desc nulls last`
+        ? sql`${lmLikes} desc nulls last`
         : filter.sort === 'duration'
           ? sql`${ads.daysShown} desc nulls last`
           : desc(recencySql);
@@ -120,11 +133,12 @@ export async function listAds(filter: AdListFilter = {}): Promise<AdCard[]> {
       ctaText: ads.ctaText,
       landingUrl: ads.landingUrl,
       landingDomain: ads.landingDomain,
-      latestViews: latestViewsSql,
-      latestLikes: latestLikesSql,
+      latestViews: lmViews,
+      latestLikes: lmLikes,
     })
     .from(ads)
     .innerJoin(competitors, eq(competitors.id, ads.competitorId))
+    .leftJoin(latestMetricsJoin, sql`lm.ad_id = ${ads.id}`)
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(order)
     .limit(filter.limit ?? 101) // 페이지 크기 + 1 (다음 페이지 유무 판별)
